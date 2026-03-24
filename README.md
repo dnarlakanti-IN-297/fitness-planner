@@ -153,3 +153,7 @@ fitness-planner/
 - `bodyweight`: No equipment needed
 - `home`: Dumbbells/basic equipment
 - `gym`: Full gym access
+
+## CloudBees Unify CI/CD
+
+This project now uses CloudBees Unify for CI/CD automation.
