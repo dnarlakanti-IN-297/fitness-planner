@@ -29,49 +29,45 @@ jobs:
       - name: Checkout code
         uses: cloudbees-io/checkout@v1
 
-      # Step 2: Set up Python
-      - name: Set up Python
-        # TODO: Verify CloudBees Python setup action
-        # Look for: cloudbees-io/setup-python or similar
-        uses: cloudbees-io/configure-python-version@v1
-        with:
-          version: '3.11'
-
-      # Step 3: Install dependencies
-      - name: Install dependencies
+      # Step 2: Install dependencies and run tests in Python container
+      - name: Install dependencies and run tests
         uses: docker://python:3.11-slim
         shell: sh
         run: |
           python -m pip install --upgrade pip
           pip install -r requirements.txt
-
-      # Step 4: Run tests
-      - name: Run tests with pytest
-        uses: docker://python:3.11-slim
-        shell: sh
-        run: |
           pytest tests/ -v --tb=short --junitxml=test-results.xml
 
-      # Step 5: Publish test results
-      # TODO: Verify how CloudBees Unify publishes test results
-      # Look for: cloudbees-io/publish-test-results or similar action
-      - name: Publish test results
-        uses: cloudbees-io/publish-test-results@v1
-        with:
-          file: test-results.xml
+      # Step 3: Publish test results
+      # TODO: Find correct CloudBees action for test results
+      # For now, just echo that tests passed
+      - name: Show test results
+        uses: docker://alpine:latest
+        shell: sh
+        run: |
+          echo "Tests completed successfully!"
+          echo "Test results saved to test-results.xml"
 
-  # Job 2: Build
-  # TODO: Verify how to call a reusable workflow in CloudBees Unify
-  # This syntax might be different from GitHub Actions
+  # Job 2: Build and Push Docker Image
   build:
     needs: test
-    # TODO: Check if 'uses' is the correct way to call reusable workflow
-    # Or if there's a different mechanism in CloudBees Unify
-    uses: ./.cloudbees/workflows/build-reusable.yml
-    with:
-      image-name: fitness-planner
-      dockerfile-path: './Dockerfile'
-      context: '.'
-    secrets:
-      DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
-      DOCKERHUB_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
+    steps:
+      - name: Checkout code
+        uses: cloudbees-io/checkout@v1
+
+      - name: Configure Docker Hub credentials
+        id: dockerconfig
+        uses: cloudbees-io/configure-oci-credentials@v1
+        with:
+          registry: docker.io
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Build and push Docker image
+        id: kaniko-build
+        uses: cloudbees-io/kaniko@v1
+        kind: build
+        with:
+          destination: docker.io/${{ secrets.DOCKERHUB_USERNAME }}/fitness-planner:${{ cloudbees.scm.sha }},docker.io/${{ secrets.DOCKERHUB_USERNAME }}/fitness-planner:latest
+          context: .
+          dockerfile: ./Dockerfile
