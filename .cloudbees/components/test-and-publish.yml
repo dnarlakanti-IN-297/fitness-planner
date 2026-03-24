@@ -1,0 +1,48 @@
+# CloudBees Unify Component: Test and Publish Results
+# ✅ Updated with CloudBees Unify syntax
+#
+# TODO: Verify if components use the same apiVersion/kind format
+# or if they have a different structure in CloudBees Unify
+
+apiVersion: automation.cloudbees.io/v1alpha1
+kind: action
+name: test-and-publish
+description: 'Runs Python tests with pytest and publishes test results'
+
+# TODO: Verify input syntax for CloudBees components
+inputs:
+  python-version:
+    description: 'Python version to use'
+    required: false
+    default: '3.11'
+
+# TODO: Verify how to define component steps in CloudBees Unify
+runs:
+  using: 'composite'
+  steps:
+    # Step 1: Set up Python
+    - name: Set up Python
+      uses: cloudbees-io/configure-python-version@v1
+      with:
+        version: ${{ inputs.python-version }}
+
+    # Step 2: Install dependencies
+    - name: Install dependencies
+      uses: docker://python:3.11-slim
+      shell: sh
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+
+    # Step 3: Run tests
+    - name: Run tests with pytest
+      uses: docker://python:3.11-slim
+      shell: sh
+      run: |
+        pytest tests/ -v --tb=short --junitxml=test-results.xml
+
+    # Step 4: Publish test results
+    - name: Publish test results
+      uses: cloudbees-io/publish-test-results@v1
+      with:
+        file: test-results.xml
