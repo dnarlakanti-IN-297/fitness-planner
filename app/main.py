@@ -1,0 +1,118 @@
+from fastapi import FastAPI
+from app.models import UserProfile, BMIResult, CalorieResult, MacroResult, WorkoutPlan, DailyMealPlan, FitnessResponse
+from app.calculators import calculate_bmi, calculate_bmr, calculate_tdee, calculate_target_calories, calculate_macros
+from app.workout_engine import generate_workout_plan
+from app.diet_engine import generate_meal_plan
+
+app = FastAPI(
+    title="Fitness & Diet Planner API",
+    description="Generate personalized workout and meal plans based on your fitness goals",
+    version="1.0.0"
+)
+
+
+@app.get("/")
+def read_root():
+    """Root endpoint with API information."""
+    return {
+        "message": "Welcome to Fitness & Diet Planner API",
+        "version": "1.0.0",
+        "endpoints": {
+            "POST /calculate/bmi": "Calculate BMI",
+            "POST /calculate/calories": "Calculate calorie needs",
+            "POST /calculate/macros": "Calculate macro split",
+            "POST /generate/workout": "Generate workout plan",
+            "POST /generate/meal-plan": "Generate meal plan",
+            "POST /generate/complete-plan": "Generate complete fitness plan"
+        }
+    }
+
+
+@app.get("/health")
+def health_check():
+    """Health check endpoint."""
+    return {"status": "healthy"}
+
+
+@app.post("/calculate/bmi", response_model=BMIResult)
+def calculate_bmi_endpoint(weight_kg: float, height_cm: float):
+    """
+    Calculate Body Mass Index (BMI).
+
+    - **weight_kg**: Weight in kilograms
+    - **height_cm**: Height in centimeters
+    """
+    return calculate_bmi(weight_kg, height_cm)
+
+
+@app.post("/calculate/calories", response_model=CalorieResult)
+def calculate_calories_endpoint(profile: UserProfile):
+    """
+    Calculate calorie needs based on user profile.
+
+    Returns BMR, TDEE, and target calories based on goal.
+    """
+    bmr = calculate_bmr(profile.weight, profile.height, profile.age, profile.gender)
+    tdee = calculate_tdee(bmr, profile.activity_level)
+    return calculate_target_calories(tdee, profile.goal)
+
+
+@app.post("/calculate/macros", response_model=MacroResult)
+def calculate_macros_endpoint(profile: UserProfile):
+    """
+    Calculate macro split (protein/carbs/fat) based on user profile and goal.
+    """
+    bmr = calculate_bmr(profile.weight, profile.height, profile.age, profile.gender)
+    tdee = calculate_tdee(bmr, profile.activity_level)
+    calorie_result = calculate_target_calories(tdee, profile.goal)
+    return calculate_macros(calorie_result.target_calories, profile.goal)
+
+
+@app.post("/generate/workout", response_model=WorkoutPlan)
+def generate_workout_endpoint(profile: UserProfile):
+    """
+    Generate a weekly workout plan based on goal and available equipment.
+    """
+    return generate_workout_plan(profile.goal, profile.equipment)
+
+
+@app.post("/generate/meal-plan", response_model=DailyMealPlan)
+def generate_meal_plan_endpoint(profile: UserProfile):
+    """
+    Generate a daily meal plan based on calorie needs and dietary preferences.
+    """
+    bmr = calculate_bmr(profile.weight, profile.height, profile.age, profile.gender)
+    tdee = calculate_tdee(bmr, profile.activity_level)
+    calorie_result = calculate_target_calories(tdee, profile.goal)
+    return generate_meal_plan(calorie_result.target_calories, profile.diet_preference)
+
+
+@app.post("/generate/complete-plan", response_model=FitnessResponse)
+def generate_complete_plan(profile: UserProfile):
+    """
+    Generate a complete fitness plan including:
+    - BMI calculation
+    - Calorie needs
+    - Macro split
+    - Weekly workout plan
+    - Daily meal plan
+    """
+    # Calculate all metrics
+    bmi = calculate_bmi(profile.weight, profile.height)
+    bmr = calculate_bmr(profile.weight, profile.height, profile.age, profile.gender)
+    tdee = calculate_tdee(bmr, profile.activity_level)
+    calories = calculate_target_calories(tdee, profile.goal)
+    macros = calculate_macros(calories.target_calories, profile.goal)
+
+    # Generate plans
+    workout_plan = generate_workout_plan(profile.goal, profile.equipment)
+    meal_plan = generate_meal_plan(calories.target_calories, profile.diet_preference)
+
+    return FitnessResponse(
+        profile=profile,
+        bmi=bmi,
+        calories=calories,
+        macros=macros,
+        workout_plan=workout_plan,
+        meal_plan=meal_plan
+    )

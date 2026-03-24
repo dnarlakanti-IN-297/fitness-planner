@@ -1,0 +1,10 @@
+{
+  "age": 30,
+  "weight": 75,
+  "height": 180,
+  "gender": "male",
+  "activity_level": "moderate",
+  "goal": "gain_muscle",
+  "diet_preference": "high_protein",
+  "equipment": "gym"
+}

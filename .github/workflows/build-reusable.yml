@@ -1,0 +1,59 @@
+name: Reusable Build Workflow
+
+on:
+  workflow_call:
+    inputs:
+      image-name:
+        required: true
+        type: string
+      dockerfile-path:
+        required: false
+        type: string
+        default: './Dockerfile'
+      context:
+        required: false
+        type: string
+        default: '.'
+    secrets:
+      DOCKERHUB_USERNAME:
+        required: true
+      DOCKERHUB_TOKEN:
+        required: true
+
+jobs:
+  build-and-push:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Extract metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ secrets.DOCKERHUB_USERNAME }}/${{ inputs.image-name }}
+          tags: |
+            type=ref,event=branch
+            type=ref,event=pr
+            type=sha,prefix={{branch}}-
+            type=raw,value=latest,enable={{is_default_branch}}
+
+      - name: Build and push with Kaniko
+        uses: aevea/action-kaniko@master
+        with:
+          image: ${{ secrets.DOCKERHUB_USERNAME }}/${{ inputs.image-name }}
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+          tag: ${{ github.sha }}
+          tag_with_latest: ${{ github.ref == 'refs/heads/main' }}
+          path: ${{ inputs.context }}
+          build_file: ${{ inputs.dockerfile-path }}

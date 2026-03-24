@@ -1,0 +1,31 @@
+name: CI Workflow
+
+on:
+  push:
+    branches:
+      - main
+      - develop
+  workflow_dispatch:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Run tests and publish results
+        uses: ./.github/actions/test-and-publish
+        with:
+          python-version: '3.11'
+
+  build:
+    needs: test
+    uses: ./.github/workflows/build-reusable.yml
+    with:
+      image-name: fitness-planner
+      dockerfile-path: './Dockerfile'
+      context: '.'
+    secrets:
+      DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
+      DOCKERHUB_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
