@@ -39,7 +39,7 @@ runs:
       uses: docker://python:3.11-slim
       shell: sh
       run: |
-        pytest tests/ -v --tb=short --junitxml=test-results.xml
+        pytest tests/ -v --tb=short --junitxml=test-results.xml --cov=app --cov-report=xml --cov-report=html --cov-report=term
 
     # Step 4: Publish test results
     - name: Publish test results
@@ -47,3 +47,20 @@ runs:
       with:
         test-type: JUNIT
         results-path: test-results.xml
+
+    # Step 5: Publish test evidence
+    - name: Publish test coverage evidence
+      uses: cloudbees-io/publish-evidence-item@v1
+      with:
+        content: |-
+          ## Test Coverage Report
+          - Workflow Run ID: ${{ cloudbees.run_id }}
+          - Branch: ${{ cloudbees.scm.branch }}
+          - Commit: ${{ cloudbees.scm.sha }}
+
+          ### Coverage Summary
+          Coverage report generated successfully with pytest-cov.
+
+          **Files:**
+          - coverage.xml (XML format)
+          - htmlcov/ (HTML report)
