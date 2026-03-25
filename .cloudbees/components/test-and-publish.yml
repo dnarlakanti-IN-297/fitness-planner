@@ -49,18 +49,12 @@ runs:
         results-path: test-results.xml
 
     # Step 5: Publish test evidence
-    - name: Publish test coverage evidence
-      uses: cloudbees-io/publish-evidence-item@v1
+    - name: Publish test evidence
+      uses: https://github.com/cloudbees-io/publish-evidence-item@v1
       with:
         content: |-
-          ## Test Coverage Report
-          - Workflow Run ID: ${{ cloudbees.run_id }}
+          ## Test Results Evidence
+          - Run ID: ${{ cloudbees.run_id }}
           - Branch: ${{ cloudbees.scm.branch }}
           - Commit: ${{ cloudbees.scm.sha }}
-
-          ### Coverage Summary
-          Coverage report generated successfully with pytest-cov.
-
-          **Files:**
-          - coverage.xml (XML format)
-          - htmlcov/ (HTML report)
+          - Test Results: test-results.xml
