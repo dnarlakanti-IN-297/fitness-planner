@@ -48,14 +48,39 @@ runs:
         test-type: JUNIT
         results-path: test-results.xml
 
-    # Step 5: Publish test evidence
+    # Step 5: Extract test summary
+    - name: Extract test summary
+      id: test-summary
+      uses: docker://alpine:latest
+      shell: sh
+      run: |
+        apk add --no-cache grep
+        TOTAL=$(grep -oP 'tests="\K[0-9]+' test-results.xml || echo "0")
+        FAILURES=$(grep -oP 'failures="\K[0-9]+' test-results.xml || echo "0")
+        ERRORS=$(grep -oP 'errors="\K[0-9]+' test-results.xml || echo "0")
+        PASSED=$((TOTAL - FAILURES - ERRORS))
+        echo "$TOTAL" > $CLOUDBEES_OUTPUTS/TOTAL_TESTS
+        echo "$PASSED" > $CLOUDBEES_OUTPUTS/PASSED_TESTS
+        echo "$FAILURES" > $CLOUDBEES_OUTPUTS/FAILED_TESTS
+
+    # Step 6: Publish test evidence
     - name: Publish test evidence
       uses: https://github.com/cloudbees-io/publish-evidence-item@v1
       with:
         content: |-
-          ## Test Results Evidence
-          - Run ID: ${{ cloudbees.run_id }}
-          - Branch: ${{ cloudbees.scm.branch }}
-          - Commit: ${{ cloudbees.scm.sha }}
-          - Test Results: See test results tab for pass/fail details
-          - Test Framework: pytest with JUnit XML output
+          # Fitness Planner - Test Execution Evidence
+
+          ## Summary
+          - **Total Test Cases**: ${{ steps.test-summary.outputs.TOTAL_TESTS }}
+          - **Passed**: ${{ steps.test-summary.outputs.PASSED_TESTS }}
+          - **Failed**: ${{ steps.test-summary.outputs.FAILED_TESTS }}
+
+          ## Workflow Information
+          - **Run ID**: ${{ cloudbees.run_id }}
+          - **Branch**: ${{ cloudbees.scm.branch }}
+          - **Commit**: ${{ cloudbees.scm.sha }}
+
+          ## Test Details
+          - **Test Framework**: pytest
+          - **Test Type**: JUNIT XML
+          - **Results File**: test-results.xml
