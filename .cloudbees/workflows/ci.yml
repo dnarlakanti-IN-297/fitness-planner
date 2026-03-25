@@ -39,14 +39,11 @@ jobs:
           pytest tests/ -v --tb=short --junitxml=test-results.xml
 
       # Step 3: Publish test results
-      # TODO: Find correct CloudBees action for test results
-      # For now, just echo that tests passed
-      - name: Show test results
-        uses: docker://alpine:latest
-        shell: sh
-        run: |
-          echo "Tests completed successfully!"
-          echo "Test results saved to test-results.xml"
+      - name: Publish test results
+        uses: cloudbees-io/publish-test-results@v2
+        with:
+          test-type: JUNIT
+          results-path: test-results.xml
 
   # Job 2: Build and Push Docker Image
   build:

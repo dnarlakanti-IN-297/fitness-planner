@@ -43,6 +43,7 @@ runs:
 
     # Step 4: Publish test results
     - name: Publish test results
-      uses: cloudbees-io/publish-test-results@v1
+      uses: cloudbees-io/publish-test-results@v2
       with:
-        file: test-results.xml
+        test-type: JUNIT
+        results-path: test-results.xml
