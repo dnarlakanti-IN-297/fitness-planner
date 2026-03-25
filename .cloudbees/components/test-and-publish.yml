@@ -57,4 +57,5 @@ runs:
           - Run ID: ${{ cloudbees.run_id }}
           - Branch: ${{ cloudbees.scm.branch }}
           - Commit: ${{ cloudbees.scm.sha }}
-          - Test Results: test-results.xml
+          - Test Results: See test results tab for pass/fail details
+          - Test Framework: pytest with JUnit XML output

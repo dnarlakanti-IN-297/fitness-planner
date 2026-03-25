@@ -54,7 +54,8 @@ jobs:
             - Run ID: ${{ cloudbees.run_id }}
             - Branch: ${{ cloudbees.scm.branch }}
             - Commit: ${{ cloudbees.scm.sha }}
-            - Test Results: test-results.xml
+            - Test Results: See test results tab for pass/fail details
+            - Test Framework: pytest with JUnit XML output
 
   # Job 2: Build and Push Docker Image
   build:
@@ -79,3 +80,15 @@ jobs:
           destination: docker.io/${{ secrets.DOCKERHUB_USERNAME }}/fitness-planner:${{ cloudbees.scm.sha }},docker.io/${{ secrets.DOCKERHUB_USERNAME }}/fitness-planner:latest
           context: .
           dockerfile: ./Dockerfile
+
+      # Publish build evidence
+      - name: Publish build evidence
+        uses: https://github.com/cloudbees-io/publish-evidence-item@v1
+        with:
+          content: |-
+            ## Build Evidence
+            - Run ID: ${{ cloudbees.run_id }}
+            - Branch: ${{ cloudbees.scm.branch }}
+            - Commit: ${{ cloudbees.scm.sha }}
+            - Docker Image: docker.io/${{ secrets.DOCKERHUB_USERNAME }}/fitness-planner:${{ cloudbees.scm.sha }}
+            - Build Status: Successfully built and pushed to Docker Hub
