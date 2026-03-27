@@ -5,7 +5,6 @@ apiVersion: automation.cloudbees.io/v1alpha1
 kind: workflow
 name: Build Reusable Workflow
 
-# TODO: Verify if reusable workflows use workflow_call or different mechanism
 on:
   workflow_call:
     inputs:
@@ -60,10 +59,14 @@ jobs:
           context: ${{ inputs.context }}
           dockerfile: ${{ inputs.dockerfile-path }}
 
-      # Step 4: Print build output (optional)
-      - name: Print Kaniko build output
-        uses: docker://alpine:latest
-        shell: sh
-        run: |
-          echo "Image built and pushed successfully"
-          echo "SHA tag: ${{ cloudbees.scm.sha }}"
+      # Step 4: Publish build evidence
+      - name: Publish build evidence
+        uses: https://github.com/cloudbees-io/publish-evidence-item@v1
+        with:
+          content: |-
+            ## Build Evidence
+            - Run ID: ${{ cloudbees.run_id }}
+            - Branch: ${{ cloudbees.scm.branch }}
+            - Commit: ${{ cloudbees.scm.sha }}
+            - Docker Image: docker.io/${{ secrets.DOCKERHUB_USERNAME }}/${{ inputs.image-name }}:${{ cloudbees.scm.sha }}
+            - Build Status: Successfully built and pushed to Docker Hub
