@@ -58,27 +58,13 @@ jobs:
           echo "$PASSED" > $CLOUDBEES_OUTPUTS/PASSED_TESTS
           echo "$FAILURES" > $CLOUDBEES_OUTPUTS/FAILED_TESTS
 
-      # Step 5: Publish test evidence
+      # Step 5: Publish test evidence using reusable component
       - name: Publish test evidence
-        uses: https://github.com/cloudbees-io/publish-evidence-item@v1
+        uses: ./.cloudbees/components/publish-test-evidence
         with:
-          content: |-
-            # Fitness Planner - Test Execution Evidence
-
-            ## Summary
-            - **Total Test Cases**: ${{ steps.test-summary.outputs.TOTAL_TESTS }}
-            - **Passed**: ${{ steps.test-summary.outputs.PASSED_TESTS }}
-            - **Failed**: ${{ steps.test-summary.outputs.FAILED_TESTS }}
-
-            ## Workflow Information
-            - **Run ID**: ${{ cloudbees.run_id }}
-            - **Branch**: ${{ cloudbees.scm.branch }}
-            - **Commit**: ${{ cloudbees.scm.sha }}
-
-            ## Test Details
-            - **Test Framework**: pytest
-            - **Test Type**: JUNIT XML
-            - **Results File**: test-results.xml
+          total-tests: ${{ steps.test-summary.outputs.TOTAL_TESTS }}
+          passed-tests: ${{ steps.test-summary.outputs.PASSED_TESTS }}
+          failed-tests: ${{ steps.test-summary.outputs.FAILED_TESTS }}
 
   # Job 2: Build and Push Docker Image
   # Calls the reusable build workflow
