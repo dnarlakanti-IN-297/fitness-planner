@@ -27,6 +27,22 @@ on:
         required: true
       DOCKERHUB_USERNAME:
         required: true
+  workflow_dispatch:
+    inputs:
+      image-tag:
+        description: 'Docker image tag (e.g., commit SHA or "latest")'
+        required: true
+        type: string
+      image-name:
+        description: 'Docker image name'
+        required: false
+        type: string
+        default: 'fitness-planner'
+      environment:
+        description: 'Deployment environment'
+        required: false
+        type: string
+        default: 'production'
 
 permissions:
   scm-token-own: read
