@@ -46,16 +46,7 @@ jobs:
         with:
           secname: ${{ secrets.KUBECONFIG }}
 
-      # Step 3: Verify cluster connection
-      - name: Verify cluster connection
-        uses: docker://bitnami/kubectl:latest
-        shell: sh
-        run: |
-          echo "Verifying cluster connection..."
-          kubectl cluster-info
-          kubectl get nodes
-
-      # Step 4: Update deployment manifest with Docker image
+      # Step 3: Update deployment manifest with Docker image
       - name: Update deployment manifest
         uses: docker://alpine:latest
         shell: sh
@@ -67,7 +58,7 @@ jobs:
           echo "Updated deployment.yaml:"
           cat k8s/deployment.yaml
 
-      # Step 5: Apply Kubernetes manifests
+      # Step 4: Apply Kubernetes manifests
       - name: Deploy to Kubernetes
         uses: docker://bitnami/kubectl:latest
         shell: sh
@@ -81,7 +72,7 @@ jobs:
 
           echo "Deployment completed successfully!"
 
-      # Step 6: Get deployment details
+      # Step 5: Get deployment details
       - name: Get deployment information
         id: deployment-info
         uses: docker://bitnami/kubectl:latest
@@ -122,7 +113,7 @@ jobs:
           echo "Pods: $POD_NAMES"
           echo "Deploy Time: $DEPLOY_TIME"
 
-      # Step 7: Publish deployment evidence (register deployed artifact)
+      # Step 6: Publish deployment evidence (register deployed artifact)
       - name: Publish deployment evidence
         uses: https://github.com/cloudbees-io/publish-evidence-item@v1
         with:
