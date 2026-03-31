@@ -46,7 +46,27 @@ jobs:
         with:
           secname: ${{ secrets.KUBECONFIG }}
 
-      # Step 3: Update deployment manifest with Docker image
+      # Step 3: Debug - Show cluster configuration
+      - name: Show cluster configuration
+        uses: docker://bitnami/kubectl:latest
+        shell: sh
+        run: |
+          echo "=== Current Context ==="
+          kubectl config current-context
+
+          echo ""
+          echo "=== Cluster Info (sanitized) ==="
+          kubectl config view --minify
+
+          echo ""
+          echo "=== Available Namespaces ==="
+          kubectl get namespaces
+
+          echo ""
+          echo "=== Current Namespace Pods ==="
+          kubectl get pods
+
+      # Step 4: Update deployment manifest with Docker image
       - name: Update deployment manifest
         uses: docker://alpine:latest
         shell: sh
@@ -58,7 +78,7 @@ jobs:
           echo "Updated deployment.yaml:"
           cat k8s/deployment.yaml
 
-      # Step 4: Apply Kubernetes manifests
+      # Step 5: Apply Kubernetes manifests
       - name: Deploy to Kubernetes
         uses: docker://bitnami/kubectl:latest
         shell: sh
@@ -72,7 +92,7 @@ jobs:
 
           echo "Deployment completed successfully!"
 
-      # Step 5: Get deployment details
+      # Step 6: Get deployment details
       - name: Get deployment information
         id: deployment-info
         uses: docker://bitnami/kubectl:latest
@@ -113,7 +133,7 @@ jobs:
           echo "Pods: $POD_NAMES"
           echo "Deploy Time: $DEPLOY_TIME"
 
-      # Step 6: Publish deployment evidence (register deployed artifact)
+      # Step 7: Publish deployment evidence (register deployed artifact)
       - name: Publish deployment evidence
         uses: https://github.com/cloudbees-io/publish-evidence-item@v1
         with:
