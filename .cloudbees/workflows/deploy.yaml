@@ -1,0 +1,170 @@
+# CloudBees Unify Deployment Workflow
+# Deploys fitness-planner app to GKE cluster
+
+apiVersion: automation.cloudbees.io/v1alpha1
+kind: workflow
+name: Deploy to GKE
+
+on:
+  workflow_call:
+    inputs:
+      docker-image:
+        description: 'Full Docker image path with tag (e.g., docker.io/username/fitness-planner:sha)'
+        required: true
+        type: string
+      environment:
+        description: 'Deployment environment'
+        required: false
+        type: string
+        default: 'production'
+    secrets:
+      KUBECONFIG:
+        required: true
+
+permissions:
+  scm-token-own: read
+  scm-token-org: read
+  id-token: read
+
+jobs:
+  deploy:
+    steps:
+      # Step 1: Checkout code to get k8s manifests
+      - name: Checkout code
+        uses: cloudbees-io/checkout@v1
+
+      # Step 2: Configure kubectl with kubeconfig secret
+      - name: Configure kubectl
+        uses: docker://bitnami/kubectl:latest
+        shell: sh
+        run: |
+          echo "Setting up kubeconfig..."
+          mkdir -p $HOME/.kube
+          echo "${{ secrets.KUBECONFIG }}" > $HOME/.kube/config
+          chmod 600 $HOME/.kube/config
+
+          echo "Verifying cluster connection..."
+          kubectl cluster-info
+          kubectl get nodes
+
+      # Step 3: Update deployment manifest with Docker image
+      - name: Update deployment manifest
+        uses: docker://alpine:latest
+        shell: sh
+        run: |
+          echo "Updating deployment.yaml with image: ${{ inputs.docker-image }}"
+          sed -i "s|IMAGE_PLACEHOLDER|${{ inputs.docker-image }}|g" k8s/deployment.yaml
+
+          echo "Updated deployment.yaml:"
+          cat k8s/deployment.yaml
+
+      # Step 4: Apply Kubernetes manifests
+      - name: Deploy to Kubernetes
+        uses: docker://bitnami/kubectl:latest
+        shell: sh
+        run: |
+          echo "Applying Kubernetes manifests..."
+          kubectl apply -f k8s/service.yaml
+          kubectl apply -f k8s/deployment.yaml
+
+          echo "Waiting for deployment rollout..."
+          kubectl rollout status deployment/fitness-planner --timeout=5m
+
+          echo "Deployment completed successfully!"
+
+      # Step 5: Get deployment details
+      - name: Get deployment information
+        id: deployment-info
+        uses: docker://bitnami/kubectl:latest
+        shell: sh
+        run: |
+          echo "Fetching deployment details..."
+
+          # Get deployment status
+          REPLICAS=$(kubectl get deployment fitness-planner -o jsonpath='{.status.replicas}')
+          READY_REPLICAS=$(kubectl get deployment fitness-planner -o jsonpath='{.status.readyReplicas}')
+          AVAILABLE_REPLICAS=$(kubectl get deployment fitness-planner -o jsonpath='{.status.availableReplicas}')
+
+          # Get service external IP (may take a moment for LoadBalancer)
+          EXTERNAL_IP=$(kubectl get service fitness-planner -o jsonpath='{.status.loadBalancer.ingress[0].ip}')
+          if [ -z "$EXTERNAL_IP" ]; then
+            EXTERNAL_IP="pending"
+          fi
+
+          # Get pod names
+          POD_NAMES=$(kubectl get pods -l app=fitness-planner -o jsonpath='{.items[*].metadata.name}')
+
+          # Get current timestamp
+          DEPLOY_TIME=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
+
+          # Output to CloudBees
+          echo "$REPLICAS" > $CLOUDBEES_OUTPUTS/REPLICAS
+          echo "$READY_REPLICAS" > $CLOUDBEES_OUTPUTS/READY_REPLICAS
+          echo "$AVAILABLE_REPLICAS" > $CLOUDBEES_OUTPUTS/AVAILABLE_REPLICAS
+          echo "$EXTERNAL_IP" > $CLOUDBEES_OUTPUTS/EXTERNAL_IP
+          echo "$POD_NAMES" > $CLOUDBEES_OUTPUTS/POD_NAMES
+          echo "$DEPLOY_TIME" > $CLOUDBEES_OUTPUTS/DEPLOY_TIME
+
+          echo ""
+          echo "=== Deployment Information ==="
+          echo "Replicas: $READY_REPLICAS/$REPLICAS ready"
+          echo "Available: $AVAILABLE_REPLICAS"
+          echo "Service IP: $EXTERNAL_IP"
+          echo "Pods: $POD_NAMES"
+          echo "Deploy Time: $DEPLOY_TIME"
+
+      # Step 6: Publish deployment evidence (register deployed artifact)
+      - name: Publish deployment evidence
+        uses: https://github.com/cloudbees-io/publish-evidence-item@v1
+        with:
+          content: |-
+            # Fitness Planner - Deployment Evidence
+
+            ## Deployment Summary
+            - **Environment**: ${{ inputs.environment }}
+            - **Status**: Successfully Deployed ✅
+            - **Deployment Time**: ${{ steps.deployment-info.outputs.DEPLOY_TIME }}
+
+            ## Deployed Artifact
+            - **Artifact Type**: Docker Container Image
+            - **Artifact Location**: Docker Hub
+            - **Image**: ${{ inputs.docker-image }}
+            - **Registry**: docker.io
+            - **Deployed To**: Google Kubernetes Engine (GKE)
+
+            ## Kubernetes Deployment Details
+            - **Cluster**: GKE
+            - **Namespace**: default
+            - **Deployment Name**: fitness-planner
+            - **Service Name**: fitness-planner
+            - **Service Type**: LoadBalancer
+            - **Replicas**: ${{ steps.deployment-info.outputs.READY_REPLICAS }}/${{ steps.deployment-info.outputs.REPLICAS }}
+            - **Available Replicas**: ${{ steps.deployment-info.outputs.AVAILABLE_REPLICAS }}
+            - **External IP**: ${{ steps.deployment-info.outputs.EXTERNAL_IP }}
+
+            ## Pod Information
+            - **Pods**: ${{ steps.deployment-info.outputs.POD_NAMES }}
+            - **Container Port**: 8000
+            - **Resources**: 256Mi memory, 0.25 CPU (requests)
+            - **Limits**: 512Mi memory, 0.5 CPU
+
+            ## Health Checks
+            - **Liveness Probe**: GET /health on port 8000
+            - **Readiness Probe**: GET /health on port 8000
+            - **Rollout Status**: Completed Successfully
+
+            ## Workflow Information
+            - **Run ID**: ${{ cloudbees.run_id }}
+            - **Branch**: ${{ cloudbees.scm.branch }}
+            - **Commit SHA**: ${{ cloudbees.scm.sha }}
+            - **Workflow**: Deploy to GKE
+
+            ## Access Information
+            - **API Base URL**: http://${{ steps.deployment-info.outputs.EXTERNAL_IP }}
+            - **Health Check**: http://${{ steps.deployment-info.outputs.EXTERNAL_IP }}/health
+            - **API Documentation**: http://${{ steps.deployment-info.outputs.EXTERNAL_IP }}/docs
+
+            ## Deployment Manifest
+            - **File**: k8s/deployment.yaml
+            - **Applied**: kubectl apply -f k8s/deployment.yaml
+            - **Service**: kubectl apply -f k8s/service.yaml

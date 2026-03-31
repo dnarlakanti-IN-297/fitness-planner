@@ -78,3 +78,14 @@ jobs:
     secrets:
       DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
       DOCKERHUB_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
+
+  # Job 3: Deploy to GKE
+  # Calls the deploy workflow
+  deploy:
+    needs: build
+    uses: ./.cloudbees/workflows/deploy.yaml
+    with:
+      docker-image: docker.io/${{ secrets.DOCKERHUB_USERNAME }}/fitness-planner:${{ cloudbees.scm.sha }}
+      environment: production
+    secrets:
+      KUBECONFIG: ${{ secrets.KUBECONFIG }}
