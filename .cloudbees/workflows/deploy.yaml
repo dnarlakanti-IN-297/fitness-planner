@@ -41,20 +41,21 @@ jobs:
         uses: cloudbees-io/checkout@v1
 
       # Step 2: Configure kubectl with kubeconfig secret
-      - name: Configure kubectl
+      - name: Set kubeconfig
+        uses: cashokannamalai/kubeconfig@v1
+        with:
+          secname: ${{ secrets.KUBECONFIG }}
+
+      # Step 3: Verify cluster connection
+      - name: Verify cluster connection
         uses: docker://bitnami/kubectl:latest
         shell: sh
         run: |
-          echo "Setting up kubeconfig..."
-          mkdir -p $HOME/.kube
-          echo "${{ secrets.KUBECONFIG }}" > $HOME/.kube/config
-          chmod 600 $HOME/.kube/config
-
           echo "Verifying cluster connection..."
           kubectl cluster-info
           kubectl get nodes
 
-      # Step 3: Update deployment manifest with Docker image
+      # Step 4: Update deployment manifest with Docker image
       - name: Update deployment manifest
         uses: docker://alpine:latest
         shell: sh
@@ -66,7 +67,7 @@ jobs:
           echo "Updated deployment.yaml:"
           cat k8s/deployment.yaml
 
-      # Step 4: Apply Kubernetes manifests
+      # Step 5: Apply Kubernetes manifests
       - name: Deploy to Kubernetes
         uses: docker://bitnami/kubectl:latest
         shell: sh
@@ -80,7 +81,7 @@ jobs:
 
           echo "Deployment completed successfully!"
 
-      # Step 5: Get deployment details
+      # Step 6: Get deployment details
       - name: Get deployment information
         id: deployment-info
         uses: docker://bitnami/kubectl:latest
@@ -121,7 +122,7 @@ jobs:
           echo "Pods: $POD_NAMES"
           echo "Deploy Time: $DEPLOY_TIME"
 
-      # Step 6: Publish deployment evidence (register deployed artifact)
+      # Step 7: Publish deployment evidence (register deployed artifact)
       - name: Publish deployment evidence
         uses: https://github.com/cloudbees-io/publish-evidence-item@v1
         with:
