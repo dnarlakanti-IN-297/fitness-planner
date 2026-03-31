@@ -85,7 +85,9 @@ jobs:
     needs: build
     uses: ./.cloudbees/workflows/deploy.yaml
     with:
-      docker-image: docker.io/${{ secrets.DOCKERHUB_USERNAME }}/fitness-planner:${{ cloudbees.scm.sha }}
+      image-tag: ${{ cloudbees.scm.sha }}
+      image-name: fitness-planner
       environment: production
     secrets:
       KUBECONFIG: ${{ secrets.KUBECONFIG }}
+      DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}

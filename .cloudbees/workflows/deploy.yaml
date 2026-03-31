@@ -8,10 +8,15 @@ name: Deploy to GKE
 on:
   workflow_call:
     inputs:
-      docker-image:
-        description: 'Full Docker image path with tag (e.g., docker.io/username/fitness-planner:sha)'
+      image-tag:
+        description: 'Docker image tag (e.g., commit SHA)'
         required: true
         type: string
+      image-name:
+        description: 'Docker image name'
+        required: false
+        type: string
+        default: 'fitness-planner'
       environment:
         description: 'Deployment environment'
         required: false
@@ -19,6 +24,8 @@ on:
         default: 'production'
     secrets:
       KUBECONFIG:
+        required: true
+      DOCKERHUB_USERNAME:
         required: true
 
 permissions:
@@ -52,8 +59,9 @@ jobs:
         uses: docker://alpine:latest
         shell: sh
         run: |
-          echo "Updating deployment.yaml with image: ${{ inputs.docker-image }}"
-          sed -i "s|IMAGE_PLACEHOLDER|${{ inputs.docker-image }}|g" k8s/deployment.yaml
+          DOCKER_IMAGE="docker.io/${{ secrets.DOCKERHUB_USERNAME }}/${{ inputs.image-name }}:${{ inputs.image-tag }}"
+          echo "Updating deployment.yaml with image: $DOCKER_IMAGE"
+          sed -i "s|IMAGE_PLACEHOLDER|$DOCKER_IMAGE|g" k8s/deployment.yaml
 
           echo "Updated deployment.yaml:"
           cat k8s/deployment.yaml
@@ -128,7 +136,7 @@ jobs:
             ## Deployed Artifact
             - **Artifact Type**: Docker Container Image
             - **Artifact Location**: Docker Hub
-            - **Image**: ${{ inputs.docker-image }}
+            - **Image**: docker.io/${{ secrets.DOCKERHUB_USERNAME }}/${{ inputs.image-name }}:${{ inputs.image-tag }}
             - **Registry**: docker.io
             - **Deployed To**: Google Kubernetes Engine (GKE)
 
