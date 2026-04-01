@@ -80,19 +80,9 @@ jobs:
 
       # Step 2: Configure kubectl with kubeconfig secret
       - name: Set kubeconfig
-        uses: docker://alpine:latest
-        shell: sh
-        run: |
-          # Create .kube directory
-          mkdir -p $HOME/.kube
-
-          # Write kubeconfig from secret
-          echo "${{ secrets.KUBECONFIG }}" > $HOME/.kube/config
-
-          # Set permissions
-          chmod 600 $HOME/.kube/config
-
-          echo "Kubeconfig written to $HOME/.kube/config"
+        uses: cloudbees-days/setup-kubeconfig
+        with:
+          kubeconfig: ${{ secrets.KUBECONFIG }}
 
       # Step 2b: Set namespace context
       - name: Set namespace context
