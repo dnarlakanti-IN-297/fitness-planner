@@ -84,9 +84,19 @@ jobs:
 
       # Step 2: Configure kubectl with kubeconfig secret
       - name: Set kubeconfig
-        uses: cloudbees-days/setup-kubeconfig
-        with:
-          kubeconfig: ${{ secrets.KUBECONFIG }}
+        uses: docker://alpine:latest
+        shell: sh
+        run: |
+          # Create .kube directory
+          mkdir -p $HOME/.kube
+
+          # Write kubeconfig from secret
+          echo "${{ secrets.KUBECONFIG }}" > $HOME/.kube/config
+
+          # Set permissions
+          chmod 600 $HOME/.kube/config
+
+          echo "Kubeconfig written to $HOME/.kube/config"
 
       # Step 2b: Set namespace context
       - name: Set namespace context
@@ -96,9 +106,23 @@ jobs:
         run: |
           NAMESPACE="${{ steps.setup-deployment-variables.outputs.NAMESPACE }}"
           echo "Setting namespace to: $NAMESPACE"
+
+          # Verify kubeconfig exists
+          if [ ! -f $HOME/.kube/config ]; then
+            echo "ERROR: Kubeconfig not found!"
+            exit 1
+          fi
+
+          # Set namespace in context
           kubectl config set-context --current --namespace=$NAMESPACE
-          echo "Current context namespace:"
-          kubectl config view --minify | grep namespace:
+
+          echo ""
+          echo "Current context:"
+          kubectl config current-context
+
+          echo ""
+          echo "Current namespace:"
+          kubectl config view --minify | grep namespace: || echo "Namespace: $NAMESPACE (will be set)"
 
       # Step 3: Debug - Show cluster configuration
       - name: Show cluster configuration
