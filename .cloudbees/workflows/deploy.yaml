@@ -84,9 +84,9 @@ jobs:
 
       # Step 2: Configure kubectl with kubeconfig secret
       - name: Set kubeconfig
-        uses: cashokannamalai/kubeconfig@v1
+        uses: cloudbees-days/setup-kubeconfig
         with:
-          secname: ${{ secrets.KUBECONFIG }}
+          kubeconfig: ${{ secrets.KUBECONFIG }}
 
       # Step 2b: Set namespace context
       - name: Set namespace context
