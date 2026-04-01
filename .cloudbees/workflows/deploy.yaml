@@ -8,9 +8,13 @@ name: Deploy to GKE
 on:
   workflow_call:
     inputs:
+      artifact-id:
+        description: 'Artifact ID from Unify manifest'
+        required: false
+        type: string
       image-tag:
         description: 'Docker image tag (e.g., commit SHA)'
-        required: true
+        required: false
         type: string
       image-name:
         description: 'Docker image name'
@@ -19,9 +23,8 @@ on:
         default: 'fitness-planner'
       environment:
         description: 'Deployment environment'
-        required: false
+        required: true
         type: string
-        default: 'production'
     secrets:
       KUBECONFIG:
         required: true
@@ -40,9 +43,8 @@ on:
         default: 'fitness-planner'
       environment:
         description: 'Deployment environment'
-        required: false
+        required: true
         type: string
-        default: 'production'
 
 permissions:
   scm-token-own: read
@@ -52,6 +54,30 @@ permissions:
 jobs:
   deploy:
     steps:
+      # Step 0: Setup deployment variables
+      - name: Setup deployment variables
+        id: setup-deployment-variables
+        uses: docker://alpine:latest
+        shell: sh
+        run: |
+          # Get namespace from environment property (set by Unify)
+          NAMESPACE="${namespace:-default}"
+          echo "NAMESPACE=$NAMESPACE" >> $CLOUDBEES_OUTPUTS/NAMESPACE
+          echo "Deploying to namespace: $NAMESPACE"
+
+          # Determine image tag (use artifact-id if provided, otherwise use image-tag)
+          if [ -n "${{ inputs.artifact-id }}" ]; then
+            IMAGE_TAG="${{ inputs.artifact-id }}"
+            echo "Using artifact-id as image tag: $IMAGE_TAG"
+          else
+            IMAGE_TAG="${{ inputs.image-tag }}"
+            echo "Using provided image-tag: $IMAGE_TAG"
+          fi
+          echo "IMAGE_TAG=$IMAGE_TAG" >> $CLOUDBEES_OUTPUTS/IMAGE_TAG
+
+          echo "Environment: ${{ inputs.environment }}"
+          echo "Image name: ${{ inputs.image-name }}"
+
       # Step 1: Checkout code to get k8s manifests
       - name: Checkout code
         uses: cloudbees-io/checkout@v1
@@ -61,6 +87,18 @@ jobs:
         uses: cashokannamalai/kubeconfig@v1
         with:
           secname: ${{ secrets.KUBECONFIG }}
+
+      # Step 2b: Set namespace context
+      - name: Set namespace context
+        id: namespace-setup
+        uses: docker://bitnami/kubectl:latest
+        shell: sh
+        run: |
+          NAMESPACE="${{ steps.setup-deployment-variables.outputs.NAMESPACE }}"
+          echo "Setting namespace to: $NAMESPACE"
+          kubectl config set-context --current --namespace=$NAMESPACE
+          echo "Current context namespace:"
+          kubectl config view --minify | grep namespace:
 
       # Step 3: Debug - Show cluster configuration
       - name: Show cluster configuration
@@ -87,7 +125,8 @@ jobs:
         uses: docker://alpine:latest
         shell: sh
         run: |
-          DOCKER_IMAGE="docker.io/${{ secrets.DOCKERHUB_USERNAME }}/${{ inputs.image-name }}:${{ inputs.image-tag }}"
+          IMAGE_TAG="${{ steps.setup-deployment-variables.outputs.IMAGE_TAG }}"
+          DOCKER_IMAGE="docker.io/${{ secrets.DOCKERHUB_USERNAME }}/${{ inputs.image-name }}:$IMAGE_TAG"
           echo "Updating deployment.yaml with image: $DOCKER_IMAGE"
           sed -i "s|IMAGE_PLACEHOLDER|$DOCKER_IMAGE|g" k8s/deployment.yaml
 
@@ -99,12 +138,13 @@ jobs:
         uses: docker://bitnami/kubectl:latest
         shell: sh
         run: |
-          echo "Applying Kubernetes manifests..."
-          kubectl apply -f k8s/service.yaml
-          kubectl apply -f k8s/deployment.yaml
+          NAMESPACE="${{ steps.setup-deployment-variables.outputs.NAMESPACE }}"
+          echo "Applying Kubernetes manifests to namespace: $NAMESPACE"
+          kubectl apply -f k8s/service.yaml -n $NAMESPACE
+          kubectl apply -f k8s/deployment.yaml -n $NAMESPACE
 
           echo "Waiting for deployment rollout..."
-          kubectl rollout status deployment/fitness-planner --timeout=5m
+          kubectl rollout status deployment/fitness-planner -n $NAMESPACE --timeout=5m
 
           echo "Deployment completed successfully!"
 
@@ -114,21 +154,22 @@ jobs:
         uses: docker://bitnami/kubectl:latest
         shell: sh
         run: |
-          echo "Fetching deployment details..."
+          NAMESPACE="${{ steps.setup-deployment-variables.outputs.NAMESPACE }}"
+          echo "Fetching deployment details from namespace: $NAMESPACE"
 
           # Get deployment status
-          REPLICAS=$(kubectl get deployment fitness-planner -o jsonpath='{.status.replicas}')
-          READY_REPLICAS=$(kubectl get deployment fitness-planner -o jsonpath='{.status.readyReplicas}')
-          AVAILABLE_REPLICAS=$(kubectl get deployment fitness-planner -o jsonpath='{.status.availableReplicas}')
+          REPLICAS=$(kubectl get deployment fitness-planner -n $NAMESPACE -o jsonpath='{.status.replicas}')
+          READY_REPLICAS=$(kubectl get deployment fitness-planner -n $NAMESPACE -o jsonpath='{.status.readyReplicas}')
+          AVAILABLE_REPLICAS=$(kubectl get deployment fitness-planner -n $NAMESPACE -o jsonpath='{.status.availableReplicas}')
 
           # Get service external IP (may take a moment for LoadBalancer)
-          EXTERNAL_IP=$(kubectl get service fitness-planner -o jsonpath='{.status.loadBalancer.ingress[0].ip}')
+          EXTERNAL_IP=$(kubectl get service fitness-planner -n $NAMESPACE -o jsonpath='{.status.loadBalancer.ingress[0].ip}')
           if [ -z "$EXTERNAL_IP" ]; then
             EXTERNAL_IP="pending"
           fi
 
           # Get pod names
-          POD_NAMES=$(kubectl get pods -l app=fitness-planner -o jsonpath='{.items[*].metadata.name}')
+          POD_NAMES=$(kubectl get pods -l app=fitness-planner -n $NAMESPACE -o jsonpath='{.items[*].metadata.name}')
 
           # Get current timestamp
           DEPLOY_TIME=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
@@ -164,13 +205,14 @@ jobs:
             ## Deployed Artifact
             - **Artifact Type**: Docker Container Image
             - **Artifact Location**: Docker Hub
-            - **Image**: docker.io/${{ secrets.DOCKERHUB_USERNAME }}/${{ inputs.image-name }}:${{ inputs.image-tag }}
+            - **Image**: docker.io/${{ secrets.DOCKERHUB_USERNAME }}/${{ inputs.image-name }}:${{ steps.setup-deployment-variables.outputs.IMAGE_TAG }}
+            - **Artifact ID**: ${{ inputs.artifact-id }}
             - **Registry**: docker.io
             - **Deployed To**: Google Kubernetes Engine (GKE)
 
             ## Kubernetes Deployment Details
             - **Cluster**: GKE
-            - **Namespace**: default
+            - **Namespace**: ${{ steps.setup-deployment-variables.outputs.NAMESPACE }}
             - **Deployment Name**: fitness-planner
             - **Service Name**: fitness-planner
             - **Service Type**: LoadBalancer
