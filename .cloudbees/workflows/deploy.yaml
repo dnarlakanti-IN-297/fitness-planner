@@ -25,11 +25,6 @@ on:
         description: 'Deployment environment'
         required: true
         type: string
-    secrets:
-      KUBECONFIG:
-        required: true
-      DOCKERHUB_USERNAME:
-        required: true
   workflow_dispatch:
     inputs:
       image-tag:
@@ -53,6 +48,7 @@ permissions:
 
 jobs:
   deploy:
+    environment: ${{ inputs.environment }}
     steps:
       # Step 0: Setup deployment variables
       - name: Setup deployment variables
