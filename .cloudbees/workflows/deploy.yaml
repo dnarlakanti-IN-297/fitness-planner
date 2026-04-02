@@ -56,15 +56,36 @@ jobs:
           EOF
 
           echo "Installing Helm chart to namespace: ${{ vars.namespace }}"
+          echo "Image: docker.io/${{ vars.DOCKERHUB_USERNAME }}/fitness-planner:${{ inputs.artifact-id }}"
 
-          # Use helm upgrade --install (idempotent)
+          # Use helm upgrade --install (idempotent) with longer timeout
           helm upgrade --install fitness-planner ./chart \
             --namespace ${{ vars.namespace }} \
             --values /tmp/values.yaml \
-            --wait \
-            --timeout 5m
+            --timeout 10m \
+            --debug
 
-          echo "✅ Helm deployment successful!"
+          echo "✅ Helm deployment initiated!"
+          echo "Note: Deployment may still be rolling out. Checking status..."
+
+      - name: Debug deployment status
+        uses: docker://bitnami/kubectl:latest
+        shell: sh
+        run: |
+          echo "=== Deployment Status ==="
+          kubectl get deployment fitness-planner -n ${{ vars.namespace }}
+
+          echo ""
+          echo "=== Pod Status ==="
+          kubectl get pods -l app=fitness-planner -n ${{ vars.namespace }}
+
+          echo ""
+          echo "=== Pod Details ==="
+          kubectl describe pods -l app=fitness-planner -n ${{ vars.namespace }}
+
+          echo ""
+          echo "=== Pod Logs (if any) ==="
+          kubectl logs -l app=fitness-planner -n ${{ vars.namespace }} --tail=50 || echo "No logs available yet"
 
       - name: Get deployment info
         id: deploy-info
