@@ -76,7 +76,6 @@ jobs:
       dockerfile-path: ./Dockerfile
       context: .
     secrets:
-      DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
       DOCKERHUB_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
 
   # Note: Deployment is handled separately through Unify Releases
