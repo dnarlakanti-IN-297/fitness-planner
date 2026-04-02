@@ -51,7 +51,6 @@ jobs:
           chart-location: ./chart
           release-name: fitness-planner
           namespace: ${{ vars.namespace }}
-          create-namespace: false
           values: |
             image:
               url: docker.io/${{ vars.DOCKERHUB_USERNAME }}/fitness-planner:${{ inputs.artifact-id }}
