@@ -1,0 +1,40 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: fitness-planner
+  labels:
+    app: fitness-planner
+spec:
+  replicas: {{ .Values.replicaCount }}
+  selector:
+    matchLabels:
+      app: fitness-planner
+  template:
+    metadata:
+      labels:
+        app: fitness-planner
+    spec:
+      containers:
+      - name: fitness-planner
+        image: {{ .Values.image.url }}
+        imagePullPolicy: {{ .Values.image.pullPolicy }}
+        ports:
+        - containerPort: {{ .Values.service.targetPort }}
+          name: http
+        env:
+        - name: PORT
+          value: "{{ .Values.service.targetPort }}"
+        resources:
+          {{- toYaml .Values.resources | nindent 10 }}
+        livenessProbe:
+          httpGet:
+            path: {{ .Values.healthCheck.path }}
+            port: {{ .Values.healthCheck.port }}
+          initialDelaySeconds: 10
+          periodSeconds: 10
+        readinessProbe:
+          httpGet:
+            path: {{ .Values.healthCheck.path }}
+            port: {{ .Values.healthCheck.port }}
+          initialDelaySeconds: 5
+          periodSeconds: 5

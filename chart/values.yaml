@@ -1,0 +1,22 @@
+image:
+  url: docker.io/dnarlakanti/fitness-planner:latest
+  pullPolicy: IfNotPresent
+
+replicaCount: 2
+
+service:
+  type: LoadBalancer
+  port: 80
+  targetPort: 8000
+
+resources:
+  requests:
+    memory: "256Mi"
+    cpu: "250m"
+  limits:
+    memory: "512Mi"
+    cpu: "500m"
+
+healthCheck:
+  path: /health
+  port: 8000
