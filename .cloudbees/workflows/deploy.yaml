@@ -46,14 +46,25 @@ jobs:
           kubeconfig: ${{ secrets.KUBECONFIG }}
 
       - name: Install helm chart
-        uses: cloudbees-io/helm-install@v1
-        with:
-          chart-location: ./chart
-          release-name: fitness-planner
-          namespace: ${{ vars.namespace }}
-          values: |
-            image:
-              url: docker.io/${{ vars.DOCKERHUB_USERNAME }}/fitness-planner:${{ inputs.artifact-id }}
+        uses: docker://alpine/helm:latest
+        shell: sh
+        run: |
+          # Create values file
+          cat > /tmp/values.yaml <<EOF
+          image:
+            url: docker.io/${{ vars.DOCKERHUB_USERNAME }}/fitness-planner:${{ inputs.artifact-id }}
+          EOF
+
+          echo "Installing Helm chart to namespace: ${{ vars.namespace }}"
+
+          # Use helm upgrade --install (idempotent)
+          helm upgrade --install fitness-planner ./chart \
+            --namespace ${{ vars.namespace }} \
+            --values /tmp/values.yaml \
+            --wait \
+            --timeout 5m
+
+          echo "✅ Helm deployment successful!"
 
       - name: Get deployment info
         id: deploy-info
