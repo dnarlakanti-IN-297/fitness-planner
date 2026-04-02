@@ -19,6 +19,24 @@ jobs:
       - name: Checkout
         uses: cloudbees-io/checkout@v1
 
+      - name: Debug workspace
+        uses: docker://alpine:latest
+        shell: sh
+        run: |
+          echo "=== Current Directory ==="
+          pwd
+          echo ""
+          echo "=== Directory Contents ==="
+          ls -la
+          echo ""
+          echo "=== Chart Directory Check ==="
+          if [ -d "chart" ]; then
+            echo "✅ chart directory exists"
+            ls -la chart/
+          else
+            echo "❌ chart directory NOT found"
+          fi
+
       - name: Set kubeconfig
         uses: cloudbees-days/setup-kubeconfig
         with:
