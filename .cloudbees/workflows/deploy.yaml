@@ -14,8 +14,6 @@ on:
     secrets:
       KUBECONFIG:
         required: true
-      DOCKERHUB_USERNAME:
-        required: true
 
 jobs:
   deploy:
@@ -33,7 +31,7 @@ jobs:
         uses: docker://alpine:latest
         shell: sh
         run: |
-          DOCKER_IMAGE="docker.io/${{ secrets.DOCKERHUB_USERNAME }}/fitness-planner:${{ inputs.artifact-id }}"
+          DOCKER_IMAGE="docker.io/${{ vars.DOCKERHUB_USERNAME }}/fitness-planner:${{ inputs.artifact-id }}"
           echo "Deploying image: $DOCKER_IMAGE"
           sed -i "s|IMAGE_PLACEHOLDER|$DOCKER_IMAGE|g" k8s/deployment.yaml
 
@@ -64,7 +62,7 @@ jobs:
         with:
           content: |-
             ## Deployed to ${{ inputs.environment }}
-            **Image:** docker.io/${{ secrets.DOCKERHUB_USERNAME }}/fitness-planner:${{ inputs.artifact-id }}
+            **Image:** docker.io/${{ vars.DOCKERHUB_USERNAME }}/fitness-planner:${{ inputs.artifact-id }}
             **Namespace:** ${{ vars.namespace }}
             **Service IP:** ${{ steps.deploy-info.outputs.EXTERNAL_IP }}
             **Health Check:** http://${{ steps.deploy-info.outputs.EXTERNAL_IP }}/health
