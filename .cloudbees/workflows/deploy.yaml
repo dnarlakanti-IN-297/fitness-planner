@@ -18,6 +18,9 @@ jobs:
     steps:
       - name: Checkout
         uses: cloudbees-io/checkout@v1
+        with:
+          repository: dnarlakanti-IN-297/fitness-planner
+          fetch-depth: 0
 
       - name: Debug workspace
         uses: docker://alpine:latest
