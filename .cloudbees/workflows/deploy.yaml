@@ -11,6 +11,9 @@ on:
       environment:
         type: string
         required: true
+      artifact-url:
+        type: string
+        required: true
 
 jobs:
   deploy:
@@ -52,11 +55,11 @@ jobs:
           # Create values file
           cat > /tmp/values.yaml <<EOF
           image:
-            url: docker.io/${{ vars.DOCKERHUB_USERNAME }}/fitness-planner:${{ inputs.artifact-id }}
+            url: ${{ inputs.artifact-url }}
           EOF
 
           echo "Installing Helm chart to namespace: ${{ vars.namespace }}"
-          echo "Image: docker.io/${{ vars.DOCKERHUB_USERNAME }}/fitness-planner:${{ inputs.artifact-id }}"
+          echo "Image: ${{ inputs.artifact-url }}"
 
           # Use helm upgrade --install (idempotent) with longer timeout
           helm upgrade --install fitness-planner ./chart \
