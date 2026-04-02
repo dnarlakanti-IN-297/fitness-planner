@@ -71,9 +71,18 @@ jobs:
         uses: docker://bitnami/kubectl:latest
         shell: sh
         run: |
-          EXTERNAL_IP=$(kubectl get service fitness-planner -n ${{ vars.namespace }} -o jsonpath='{.status.loadBalancer.ingress[0].ip}' || echo "pending")
-          echo "$EXTERNAL_IP" > $CLOUDBEES_OUTPUTS/EXTERNAL_IP
-          echo "Service IP: $EXTERNAL_IP"
+          # Get ClusterIP (internal IP)
+          CLUSTER_IP=$(kubectl get service fitness-planner -n ${{ vars.namespace }} -o jsonpath='{.spec.clusterIP}')
+          echo "$CLUSTER_IP" > $CLOUDBEES_OUTPUTS/CLUSTER_IP
+
+          # Get service port
+          SERVICE_PORT=$(kubectl get service fitness-planner -n ${{ vars.namespace }} -o jsonpath='{.spec.ports[0].port}')
+          echo "$SERVICE_PORT" > $CLOUDBEES_OUTPUTS/SERVICE_PORT
+
+          echo "Service Type: ClusterIP (internal only)"
+          echo "Cluster IP: $CLUSTER_IP"
+          echo "Service Port: $SERVICE_PORT"
+          echo "Internal URL: http://$CLUSTER_IP:$SERVICE_PORT"
 
       - name: Register deployed artifact
         uses: cloudbees-io/register-deployed-artifact@v2
@@ -87,6 +96,10 @@ jobs:
             ## Deployed to ${{ inputs.environment }}
             **Image:** docker.io/${{ vars.DOCKERHUB_USERNAME }}/fitness-planner:${{ inputs.artifact-id }}
             **Namespace:** ${{ vars.namespace }}
-            **Service IP:** ${{ steps.deploy-info.outputs.EXTERNAL_IP }}
-            **Health Check:** http://${{ steps.deploy-info.outputs.EXTERNAL_IP }}/health
+            **Service Type:** ClusterIP (internal only)
+            **Cluster IP:** ${{ steps.deploy-info.outputs.CLUSTER_IP }}
+            **Service Port:** ${{ steps.deploy-info.outputs.SERVICE_PORT }}
+            **Internal URL:** http://${{ steps.deploy-info.outputs.CLUSTER_IP }}:${{ steps.deploy-info.outputs.SERVICE_PORT }}
+
+            _Note: Service is internal only due to namespace quota restrictions. Use port-forward for external access: `kubectl port-forward -n ${{ vars.namespace }} svc/fitness-planner 8080:80`_
           format: MARKDOWN
