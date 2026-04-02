@@ -27,7 +27,7 @@ jobs:
       - name: Install helm chart
         uses: cloudbees-io/helm-install@v1
         with:
-          chart-location: ${{ cloudbees.workspace }}/chart
+          chart-location: ./chart
           release-name: fitness-planner
           namespace: ${{ vars.namespace }}
           values: |
