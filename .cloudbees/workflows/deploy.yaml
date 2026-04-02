@@ -1,258 +1,66 @@
-# CloudBees Unify Deployment Workflow
-# Deploys fitness-planner app to GKE cluster
-
 apiVersion: automation.cloudbees.io/v1alpha1
 kind: workflow
-name: Deploy to GKE
+name: deploy
 
 on:
   workflow_call:
     inputs:
       artifact-id:
-        description: 'Artifact ID from Unify manifest'
-        required: false
         type: string
-      image-tag:
-        description: 'Docker image tag (e.g., commit SHA)'
-        required: false
-        type: string
-      image-name:
-        description: 'Docker image name'
-        required: false
-        type: string
-        default: 'fitness-planner'
+        required: true
       environment:
-        description: 'Deployment environment'
+        type: string
         required: true
-        type: string
-  workflow_dispatch:
-    inputs:
-      image-tag:
-        description: 'Docker image tag (e.g., commit SHA or "latest")'
-        required: true
-        type: string
-      image-name:
-        description: 'Docker image name'
-        required: false
-        type: string
-        default: 'fitness-planner'
-      environment:
-        description: 'Deployment environment'
-        required: true
-        type: string
-
-permissions:
-  scm-token-own: read
-  scm-token-org: read
-  id-token: read
 
 jobs:
   deploy:
     environment: ${{ inputs.environment }}
     steps:
-      # Step 0: Setup deployment variables
-      - name: Setup deployment variables
-        id: setup-deployment-variables
-        uses: docker://alpine:latest
-        shell: sh
-        run: |
-          # Get namespace from environment property (set by Unify)
-          NAMESPACE="${namespace:-default}"
-          echo "NAMESPACE=$NAMESPACE" >> $CLOUDBEES_OUTPUTS/NAMESPACE
-          echo "Deploying to namespace: $NAMESPACE"
-
-          # Determine image tag (use artifact-id if provided, otherwise use image-tag)
-          if [ -n "${{ inputs.artifact-id }}" ]; then
-            IMAGE_TAG="${{ inputs.artifact-id }}"
-            echo "Using artifact-id as image tag: $IMAGE_TAG"
-          else
-            IMAGE_TAG="${{ inputs.image-tag }}"
-            echo "Using provided image-tag: $IMAGE_TAG"
-          fi
-          echo "IMAGE_TAG=$IMAGE_TAG" >> $CLOUDBEES_OUTPUTS/IMAGE_TAG
-
-          echo "Environment: ${{ inputs.environment }}"
-          echo "Image name: ${{ inputs.image-name }}"
-
-      # Step 1: Checkout code to get k8s manifests
-      - name: Checkout code
+      - name: Checkout
         uses: cloudbees-io/checkout@v1
 
-      # Step 2: Configure kubectl with kubeconfig secret
       - name: Set kubeconfig
         uses: cloudbees-days/setup-kubeconfig
         with:
           kubeconfig: ${{ secrets.KUBECONFIG }}
 
-      # Step 2b: Set namespace context
-      - name: Set namespace context
-        id: namespace-setup
-        uses: docker://bitnami/kubectl:latest
-        shell: sh
-        run: |
-          NAMESPACE="${{ steps.setup-deployment-variables.outputs.NAMESPACE }}"
-          echo "Setting namespace to: $NAMESPACE"
-
-          # Verify kubeconfig exists
-          if [ ! -f $HOME/.kube/config ]; then
-            echo "ERROR: Kubeconfig not found!"
-            exit 1
-          fi
-
-          # Set namespace in context
-          kubectl config set-context --current --namespace=$NAMESPACE
-
-          echo ""
-          echo "Current context:"
-          kubectl config current-context
-
-          echo ""
-          echo "Current namespace:"
-          kubectl config view --minify | grep namespace: || echo "Namespace: $NAMESPACE (will be set)"
-
-      # Step 3: Debug - Show cluster configuration
-      - name: Show cluster configuration
-        uses: docker://bitnami/kubectl:latest
-        shell: sh
-        run: |
-          echo "=== Current Context ==="
-          kubectl config current-context
-
-          echo ""
-          echo "=== Cluster Info (sanitized) ==="
-          kubectl config view --minify
-
-          echo ""
-          echo "=== Available Namespaces ==="
-          kubectl get namespaces
-
-          echo ""
-          echo "=== Current Namespace Pods ==="
-          kubectl get pods
-
-      # Step 4: Update deployment manifest with Docker image
       - name: Update deployment manifest
         uses: docker://alpine:latest
         shell: sh
         run: |
-          IMAGE_TAG="${{ steps.setup-deployment-variables.outputs.IMAGE_TAG }}"
-          DOCKER_IMAGE="docker.io/${{ secrets.DOCKERHUB_USERNAME }}/${{ inputs.image-name }}:$IMAGE_TAG"
-          echo "Updating deployment.yaml with image: $DOCKER_IMAGE"
+          DOCKER_IMAGE="docker.io/${{ secrets.DOCKERHUB_USERNAME }}/fitness-planner:${{ inputs.artifact-id }}"
+          echo "Deploying image: $DOCKER_IMAGE"
           sed -i "s|IMAGE_PLACEHOLDER|$DOCKER_IMAGE|g" k8s/deployment.yaml
 
-          echo "Updated deployment.yaml:"
-          cat k8s/deployment.yaml
-
-      # Step 5: Apply Kubernetes manifests
       - name: Deploy to Kubernetes
         uses: docker://bitnami/kubectl:latest
         shell: sh
         run: |
-          NAMESPACE="${{ steps.setup-deployment-variables.outputs.NAMESPACE }}"
-          echo "Applying Kubernetes manifests to namespace: $NAMESPACE"
-          kubectl apply -f k8s/service.yaml -n $NAMESPACE
-          kubectl apply -f k8s/deployment.yaml -n $NAMESPACE
+          kubectl apply -f k8s/service.yaml -n ${{ vars.namespace }}
+          kubectl apply -f k8s/deployment.yaml -n ${{ vars.namespace }}
+          kubectl rollout status deployment/fitness-planner -n ${{ vars.namespace }} --timeout=5m
 
-          echo "Waiting for deployment rollout..."
-          kubectl rollout status deployment/fitness-planner -n $NAMESPACE --timeout=5m
-
-          echo "Deployment completed successfully!"
-
-      # Step 6: Get deployment details
-      - name: Get deployment information
-        id: deployment-info
+      - name: Get deployment info
+        id: deploy-info
         uses: docker://bitnami/kubectl:latest
         shell: sh
         run: |
-          NAMESPACE="${{ steps.setup-deployment-variables.outputs.NAMESPACE }}"
-          echo "Fetching deployment details from namespace: $NAMESPACE"
-
-          # Get deployment status
-          REPLICAS=$(kubectl get deployment fitness-planner -n $NAMESPACE -o jsonpath='{.status.replicas}')
-          READY_REPLICAS=$(kubectl get deployment fitness-planner -n $NAMESPACE -o jsonpath='{.status.readyReplicas}')
-          AVAILABLE_REPLICAS=$(kubectl get deployment fitness-planner -n $NAMESPACE -o jsonpath='{.status.availableReplicas}')
-
-          # Get service external IP (may take a moment for LoadBalancer)
-          EXTERNAL_IP=$(kubectl get service fitness-planner -n $NAMESPACE -o jsonpath='{.status.loadBalancer.ingress[0].ip}')
-          if [ -z "$EXTERNAL_IP" ]; then
-            EXTERNAL_IP="pending"
-          fi
-
-          # Get pod names
-          POD_NAMES=$(kubectl get pods -l app=fitness-planner -n $NAMESPACE -o jsonpath='{.items[*].metadata.name}')
-
-          # Get current timestamp
-          DEPLOY_TIME=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
-
-          # Output to CloudBees
-          echo "$REPLICAS" > $CLOUDBEES_OUTPUTS/REPLICAS
-          echo "$READY_REPLICAS" > $CLOUDBEES_OUTPUTS/READY_REPLICAS
-          echo "$AVAILABLE_REPLICAS" > $CLOUDBEES_OUTPUTS/AVAILABLE_REPLICAS
+          EXTERNAL_IP=$(kubectl get service fitness-planner -n ${{ vars.namespace }} -o jsonpath='{.status.loadBalancer.ingress[0].ip}' || echo "pending")
           echo "$EXTERNAL_IP" > $CLOUDBEES_OUTPUTS/EXTERNAL_IP
-          echo "$POD_NAMES" > $CLOUDBEES_OUTPUTS/POD_NAMES
-          echo "$DEPLOY_TIME" > $CLOUDBEES_OUTPUTS/DEPLOY_TIME
-
-          echo ""
-          echo "=== Deployment Information ==="
-          echo "Replicas: $READY_REPLICAS/$REPLICAS ready"
-          echo "Available: $AVAILABLE_REPLICAS"
           echo "Service IP: $EXTERNAL_IP"
-          echo "Pods: $POD_NAMES"
-          echo "Deploy Time: $DEPLOY_TIME"
 
-      # Step 7: Publish deployment evidence (register deployed artifact)
-      - name: Publish deployment evidence
-        uses: https://github.com/cloudbees-io/publish-evidence-item@v1
+      - name: Register deployed artifact
+        uses: cloudbees-io/register-deployed-artifact@v2
+        with:
+          artifact-id: ${{ inputs.artifact-id }}
+
+      - name: Publish evidence
+        uses: cloudbees-io/publish-evidence-item@v1
         with:
           content: |-
-            # Fitness Planner - Deployment Evidence
-
-            ## Deployment Summary
-            - **Environment**: ${{ inputs.environment }}
-            - **Status**: Successfully Deployed ✅
-            - **Deployment Time**: ${{ steps.deployment-info.outputs.DEPLOY_TIME }}
-
-            ## Deployed Artifact
-            - **Artifact Type**: Docker Container Image
-            - **Artifact Location**: Docker Hub
-            - **Image**: docker.io/${{ secrets.DOCKERHUB_USERNAME }}/${{ inputs.image-name }}:${{ steps.setup-deployment-variables.outputs.IMAGE_TAG }}
-            - **Artifact ID**: ${{ inputs.artifact-id }}
-            - **Registry**: docker.io
-            - **Deployed To**: Google Kubernetes Engine (GKE)
-
-            ## Kubernetes Deployment Details
-            - **Cluster**: GKE
-            - **Namespace**: ${{ steps.setup-deployment-variables.outputs.NAMESPACE }}
-            - **Deployment Name**: fitness-planner
-            - **Service Name**: fitness-planner
-            - **Service Type**: LoadBalancer
-            - **Replicas**: ${{ steps.deployment-info.outputs.READY_REPLICAS }}/${{ steps.deployment-info.outputs.REPLICAS }}
-            - **Available Replicas**: ${{ steps.deployment-info.outputs.AVAILABLE_REPLICAS }}
-            - **External IP**: ${{ steps.deployment-info.outputs.EXTERNAL_IP }}
-
-            ## Pod Information
-            - **Pods**: ${{ steps.deployment-info.outputs.POD_NAMES }}
-            - **Container Port**: 8000
-            - **Resources**: 256Mi memory, 0.25 CPU (requests)
-            - **Limits**: 512Mi memory, 0.5 CPU
-
-            ## Health Checks
-            - **Liveness Probe**: GET /health on port 8000
-            - **Readiness Probe**: GET /health on port 8000
-            - **Rollout Status**: Completed Successfully
-
-            ## Workflow Information
-            - **Run ID**: ${{ cloudbees.run_id }}
-            - **Branch**: ${{ cloudbees.scm.branch }}
-            - **Commit SHA**: ${{ cloudbees.scm.sha }}
-            - **Workflow**: Deploy to GKE
-
-            ## Access Information
-            - **API Base URL**: http://${{ steps.deployment-info.outputs.EXTERNAL_IP }}
-            - **Health Check**: http://${{ steps.deployment-info.outputs.EXTERNAL_IP }}/health
-            - **API Documentation**: http://${{ steps.deployment-info.outputs.EXTERNAL_IP }}/docs
-
-            ## Deployment Manifest
-            - **File**: k8s/deployment.yaml
-            - **Applied**: kubectl apply -f k8s/deployment.yaml
-            - **Service**: kubectl apply -f k8s/service.yaml
+            ## Deployed to ${{ inputs.environment }}
+            **Image:** docker.io/${{ secrets.DOCKERHUB_USERNAME }}/fitness-planner:${{ inputs.artifact-id }}
+            **Namespace:** ${{ vars.namespace }}
+            **Service IP:** ${{ steps.deploy-info.outputs.EXTERNAL_IP }}
+            **Health Check:** http://${{ steps.deploy-info.outputs.EXTERNAL_IP }}/health
+          format: MARKDOWN
