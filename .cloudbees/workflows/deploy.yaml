@@ -11,6 +11,11 @@ on:
       environment:
         type: string
         required: true
+    secrets:
+      KUBECONFIG:
+        required: true
+      DOCKERHUB_USERNAME:
+        required: true
 
 jobs:
   deploy:
