@@ -118,7 +118,8 @@ jobs:
         with:
           content: |-
             ## Deployed to ${{ inputs.environment }}
-            **Image:** docker.io/${{ vars.DOCKERHUB_USERNAME }}/fitness-planner:${{ inputs.artifact-id }}
+            **Image:** ${{ inputs.artifact-url }}
+            **Artifact ID:** ${{ inputs.artifact-id }}
             **Namespace:** ${{ vars.namespace }}
             **Service Type:** ClusterIP (internal only)
             **Cluster IP:** ${{ steps.deploy-info.outputs.CLUSTER_IP }}
