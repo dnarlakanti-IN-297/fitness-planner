@@ -39,7 +39,7 @@ jobs:
           if [ -d "chart" ]; then
             echo "✅ chart directory exists"
             ls -la chart/
-          else
+          elsesdfsdf
             echo "❌ chart directory NOT found"
           fi
 
@@ -48,28 +48,16 @@ jobs:
         with:
           kubeconfig: ${{ secrets.KUBECONFIG }}
 
-      - name: Install helm chart
-        uses: docker://alpine/helm:latest
-        shell: sh
-        run: |
-          # Create values file
-          cat > /tmp/values.yaml <<EOF
-          image:
+      - id: install-chart
+        name: Install helm chart
+        uses: cloudbees-io/helm-install@v1
+        with:
+          chart-location: ${{ cloudbees.workspace }}/chart
+          release-name: fitness-planner
+          namespace: ${{ vars.namespace }}
+          values: |
             url: ${{ inputs.artifact-url }}
-          EOF
 
-          echo "Installing Helm chart to namespace: ${{ vars.namespace }}"
-          echo "Image: ${{ inputs.artifact-url }}"
-
-          # Use helm upgrade --install (idempotent) with longer timeout
-          helm upgrade --install fitness-planner ./chart \
-            --namespace ${{ vars.namespace }} \
-            --values /tmp/values.yaml \
-            --timeout 10m \
-            --debug
-
-          echo "✅ Helm deployment initiated!"
-          echo "Note: Deployment may still be rolling out. Checking status..."
 
       - name: Debug deployment status
         uses: docker://bitnami/kubectl:latest
