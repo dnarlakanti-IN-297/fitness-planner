@@ -39,7 +39,7 @@ jobs:
           if [ -d "chart" ]; then
             echo "✅ chart directory exists"
             ls -la chart/
-          elsesdfsdf
+          else
             echo "❌ chart directory NOT found"
           fi
 
