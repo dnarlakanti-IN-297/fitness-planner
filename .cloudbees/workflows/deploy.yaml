@@ -56,7 +56,8 @@ jobs:
           release-name: fitness-planner
           namespace: ${{ vars.namespace }}
           values: |
-            url: ${{ inputs.artifact-url }}
+            image:
+              url: ${{ inputs.artifact-url }}
 
 
       - name: Debug deployment status
