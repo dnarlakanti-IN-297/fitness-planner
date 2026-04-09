@@ -34,12 +34,12 @@ jobs:
 
       # Step 2: Verify Smart Tests connectivity
       - name: Verify Smart Tests connectivity
-        uses: docker://python:3.11-slim
+        uses: docker://cloudbeesdemo/maven-st:v1
         shell: sh
         run: |
-          pip install --quiet smart-tests-cli 2>/dev/null || echo "⚠️ Smart Tests CLI not available in PyPI - skipping verification"
-          # Alternative: Use CloudBees Smart Tests container if available
-          # smart-tests verify || true
+          echo "Verifying Smart Tests configuration..."
+          smart-tests verify
+          echo "✅ Smart Tests verified successfully"
 
       # Step 3: Install dependencies and run tests with Smart Tests
       - name: Install dependencies and run tests
@@ -48,11 +48,15 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           pip install -r requirements.txt
-          pip install pytest-testmon  # Smart test selection for pytest
+          pip install pytest-testmon
 
-          # Run tests with smart selection
-          echo "🧪 Running tests with smart selection..."
+          echo "🧪 Running tests with Smart Tests selection..."
+
+          # Use pytest-testmon for intelligent test selection
+          # CloudBees Smart Tests will track overall test metrics
           pytest tests/ --testmon -v --tb=short --junitxml=test-results.xml --cov=app --cov-report=xml --cov-report=html --cov-report=term
+
+          echo "✅ Tests completed"
 
       # Step 3: Publish test results
       - name: Publish test results
