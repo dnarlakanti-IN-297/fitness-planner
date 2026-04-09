@@ -69,11 +69,11 @@ jobs:
 
           # Create intelligent subset based on code changes
           # Use --get-tests-from-previous-sessions to let Smart Tests fetch test data from history
+          # No need for pytest to be installed when using --get-tests-from-previous-sessions
           smart-tests subset \
             --session @session.txt \
             --target 50% \
-            --get-tests-from-previous-sessions \
-            pytest app/ > smart-tests-subset.txt
+            --get-tests-from-previous-sessions > smart-tests-subset.txt
 
           echo "📊 Smart Tests subset output:"
           cat smart-tests-subset.txt
