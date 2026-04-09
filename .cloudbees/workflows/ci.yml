@@ -60,31 +60,85 @@ jobs:
           cat session.txt
           echo "✅ Session recorded"
 
-      # Step 5: Install dependencies and run tests with Smart Tests
-      - name: Install dependencies and run tests
+      # Step 5: Discover and filter test files
+      - name: Discover tests for Smart Tests subset
         uses: docker://python:3.11-slim
         shell: sh
         run: |
           python -m pip install --upgrade pip
           pip install -r requirements.txt
-          pip install pytest-testmon
 
-          echo "🧪 Running tests with Smart Tests selection..."
+          echo "🔍 Discovering test files..."
 
-          # Use pytest-testmon for intelligent test selection
-          # CloudBees Smart Tests will track overall test metrics
-          pytest tests/ --testmon -v --tb=short --junitxml=test-results.xml --cov=app --cov-report=xml --cov-report=html --cov-report=term
+          # Find all test files, excluding helper files
+          find tests/ -type f -name "test_*.py" -o -name "*_test.py" | \
+            grep -v "conftest.py" | \
+            grep -v "__init__.py" | \
+            grep -v "__pycache__" | \
+            sort > all-tests.lst
+
+          echo "📋 Discovered tests:"
+          cat all-tests.lst
+
+          # List all test functions for Smart Tests analysis
+          pytest --collect-only -q tests/ 2>/dev/null | \
+            grep "::" | \
+            grep -v "conftest" > all-test-functions.lst || true
+
+          echo "📋 Test functions discovered:"
+          cat all-test-functions.lst
+
+      # Step 6: Create Smart Tests subset
+      - name: Create Smart Tests subset
+        uses: docker://cloudbeesdemo/maven-st:v1
+        shell: sh
+        run: |
+          echo "🎯 Creating Smart Tests subset..."
+
+          # Create intelligent subset based on code changes
+          # Target 50% of tests (run only affected tests)
+          smart-tests subset pytest \
+            --session @session.txt \
+            --target 50% \
+            --test-list all-test-functions.lst > smart-tests-subset.txt || echo "tests/" > smart-tests-subset.txt
+
+          echo "📊 Smart Tests subset created:"
+          cat smart-tests-subset.txt
+
+          # Count tests to run
+          TEST_COUNT=$(cat smart-tests-subset.txt | wc -l | tr -d ' ')
+          echo "📈 Running $TEST_COUNT tests based on Smart Tests analysis"
+
+      # Step 7: Run tests with Smart Tests subset
+      - name: Run Smart Tests subset
+        uses: docker://python:3.11-slim
+        shell: sh
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+          echo "🧪 Running Smart Tests subset..."
+
+          # If subset contains specific test paths, use them
+          if [ -s smart-tests-subset.txt ]; then
+            echo "Running targeted test subset..."
+            # Read subset file and run those tests
+            cat smart-tests-subset.txt | xargs pytest -v --tb=short --junitxml=test-results.xml --cov=app --cov-report=xml --cov-report=html --cov-report=term
+          else
+            echo "Running all tests (no subset generated)..."
+            pytest tests/ -v --tb=short --junitxml=test-results.xml --cov=app --cov-report=xml --cov-report=html --cov-report=term
+          fi
 
           echo "✅ Tests completed"
 
-      # Step 6: Publish test results
+      # Step 8: Publish test results
       - name: Publish test results
         uses: cloudbees-io/publish-test-results@v2
         with:
           test-type: JUNIT
           results-path: test-results.xml
 
-      # Step 7: Extract test summary
+      # Step 9: Extract test summary
       - name: Extract test summary
         id: test-summary
         uses: docker://alpine:latest
@@ -99,7 +153,7 @@ jobs:
           echo "$PASSED" > $CLOUDBEES_OUTPUTS/PASSED_TESTS
           echo "$FAILURES" > $CLOUDBEES_OUTPUTS/FAILED_TESTS
 
-      # Step 8: Publish test evidence using reusable component
+      # Step 10: Publish test evidence using reusable component
       - name: Publish test evidence
         uses: ./.cloudbees/components/publish-test-evidence
         with:
