@@ -88,9 +88,10 @@ jobs:
           echo "📝 Recording test list with Smart Tests..."
 
           # Send test list to Smart Tests for analysis
+          # source_roots: app/ is where the source code is located
           cat pytest-tests.txt | smart-tests record tests \
             --session @session.txt \
-            pytest
+            pytest app/
 
           echo "✅ Tests recorded with Smart Tests"
 
