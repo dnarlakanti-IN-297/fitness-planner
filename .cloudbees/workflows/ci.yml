@@ -60,95 +60,101 @@ jobs:
           cat session.txt
           echo "✅ Session recorded"
 
-      # Step 5: Create Smart Tests subset (optional during learning phase)
-      - name: Create Smart Tests subset
-        uses: docker://cloudbeesdemo/maven-st:v1
-        shell: sh
-        run: |
-          echo "🎯 Creating Smart Tests intelligent subset..."
-
-          # Create intelligent subset based on code changes
-          # Note: Smart Tests needs ~1 day to build historical data
-          # During learning phase, this will fall back to running all tests
-          smart-tests subset pytest \
-            --session @session.txt \
-            --target 50% \
-            --get-tests-from-previous-sessions > smart-tests-subset.txt 2>&1 || true
-
-          if [ -s smart-tests-subset.txt ]; then
-            echo "📊 Smart Tests subset output:"
-            cat smart-tests-subset.txt
-
-            # Extract subset details (the table)
-            echo ""
-            echo "📈 Subset Statistics:"
-            grep "Candidates\|Subset\|Total" smart-tests-subset.txt || echo "Learning phase active"
-
-            # Extract actual test list (lines with tests/)
-            grep -E "^tests/" smart-tests-subset.txt > test-subset-list.txt 2>/dev/null || echo "tests/" > test-subset-list.txt
-
-            if [ "$(cat test-subset-list.txt)" != "tests/" ]; then
-              echo ""
-              echo "🎯 Smart Tests selected subset to run:"
-              cat test-subset-list.txt
-
-              TEST_COUNT=$(wc -l < test-subset-list.txt | tr -d ' ')
-              echo "📊 Total: $TEST_COUNT test items selected"
-            else
-              echo "📚 Learning phase: Running all tests to build historical data"
-            fi
-          else
-            echo "📚 Smart Tests is in learning phase (~1 day required)"
-            echo "Running all tests to build code-to-test mappings"
-            echo "tests/" > test-subset-list.txt
-          fi
-
-      # Step 6: Run tests with Smart Tests subset
-      - name: Run Smart Tests subset
+      # Step 5: Collect all tests with pytest
+      - name: Collect tests with pytest
         uses: docker://python:3.11-slim
         shell: sh
         run: |
           python -m pip install --upgrade pip
           pip install -r requirements.txt
 
-          echo "🧪 Running Smart Tests subset..."
+          echo "🔍 Collecting all tests with pytest..."
 
-          # Check if we have a specific test subset
-          if [ -f test-subset-list.txt ] && [ -s test-subset-list.txt ] && [ "$(cat test-subset-list.txt)" != "tests/" ]; then
-            echo "Running Smart Tests intelligent subset..."
+          # Collect all tests - this creates the full test list
+          pytest --collect-only -qq tests/ > all_tests.txt 2>&1 || true
 
-            # Run the specific tests from the subset
-            # Each line is a test file or test node ID
-            echo "Selected tests:"
-            while IFS= read -r test_path; do
-              echo "  - $test_path"
-            done < test-subset-list.txt
+          echo "📋 Collected tests:"
+          cat all_tests.txt
 
-            cat test-subset-list.txt | xargs pytest -v --tb=short --junitxml=test-results.xml --cov=app --cov-report=xml --cov-report=html --cov-report=term
+          TEST_COUNT=$(wc -l < all_tests.txt | tr -d ' ')
+          echo "📊 Total: $TEST_COUNT tests collected"
+
+      # Step 6: Generate Smart Tests subset
+      - name: Generate Smart Tests subset
+        uses: docker://cloudbeesdemo/maven-st:v1
+        shell: sh
+        run: |
+          echo "🎯 Generating Smart Tests subset..."
+
+          # Generate subset from collected tests
+          # Smart Tests analyzes commits and predicts affected tests
+          smart-tests subset \
+            --session @session.txt \
+            --target 50% \
+            pytest app/ < all_tests.txt > subset.txt 2>&1 || cp all_tests.txt subset.txt
+
+          echo "📊 Smart Tests subset generated:"
+          cat subset.txt
+
+          # Count tests in subset
+          SUBSET_COUNT=$(grep -c "::" subset.txt 2>/dev/null || wc -l < subset.txt | tr -d ' ')
+          echo "📈 Subset contains: $SUBSET_COUNT tests"
+
+      # Step 7: Run tests from subset
+      - name: Run tests from Smart Tests subset
+        uses: docker://python:3.11-slim
+        shell: sh
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+          echo "🧪 Running tests from Smart Tests subset..."
+
+          # Run tests using subset file with pytest @subset.txt syntax
+          # Use junit_family=legacy for Smart Tests compatibility
+          if [ -f subset.txt ] && [ -s subset.txt ]; then
+            pytest @subset.txt \
+              -v \
+              -o junit_family=legacy \
+              --junit-xml=test-results.xml \
+              --cov=app \
+              --cov-report=xml \
+              --cov-report=html \
+              --cov-report=term || true
+
+            echo "✅ Tests completed"
           else
-            echo "Running full test suite..."
-            echo "Reason: First run or Smart Tests learning phase"
-            pytest tests/ -v --tb=short --junitxml=test-results.xml --cov=app --cov-report=xml --cov-report=html --cov-report=term
+            echo "⚠️ No subset file found, running all tests"
+            pytest tests/ \
+              -v \
+              -o junit_family=legacy \
+              --junit-xml=test-results.xml \
+              --cov=app \
+              --cov-report=xml \
+              --cov-report=html \
+              --cov-report=term || true
           fi
 
-          echo "✅ Tests completed"
-
-      # Step 7: Record test results with Smart Tests
+      # Step 8: Record test results with Smart Tests
       - name: Record test results with Smart Tests
         uses: docker://cloudbeesdemo/maven-st:v1
         shell: sh
         run: |
           echo "📝 Recording test results with Smart Tests..."
 
-          # Record test results for Smart Tests learning
-          # This helps Smart Tests understand which tests passed/failed
-          # and improve future subset predictions
-          cat test-results.xml | smart-tests record tests \
-            --session @session.txt \
-            pytest app/ || true
+          # Record test results - pass file path as argument
+          if [ -f test-results.xml ]; then
+            echo "Found test-results.xml"
+            ls -lh test-results.xml
 
-          echo "✅ Test results recorded"
-          echo "Smart Tests will use this data to improve future test selection"
+            # Record results with Smart Tests
+            smart-tests record tests pytest app/ test-results.xml
+
+            echo "✅ Test results recorded successfully"
+          else
+            echo "⚠️ test-results.xml not found"
+            exit 1
+          fi
 
       # Step 9: Publish test results
       - name: Publish test results
@@ -172,7 +178,7 @@ jobs:
           echo "$PASSED" > $CLOUDBEES_OUTPUTS/PASSED_TESTS
           echo "$FAILURES" > $CLOUDBEES_OUTPUTS/FAILED_TESTS
 
-      # Step 11: Publish test evidence using reusable component
+      # Step 11: Publish test evidence
       - name: Publish test evidence
         uses: ./.cloudbees/components/publish-test-evidence
         with:
