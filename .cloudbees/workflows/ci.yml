@@ -143,10 +143,9 @@ jobs:
           # Record test results for Smart Tests learning
           # This helps Smart Tests understand which tests passed/failed
           # and improve future subset predictions
-          smart-tests record tests \
+          cat test-results.xml | smart-tests record tests \
             --session @session.txt \
-            --no-build \
-            pytest test-results.xml || true
+            pytest || true
 
           echo "✅ Test results recorded"
           echo "Smart Tests will use this data to improve future test selection"
