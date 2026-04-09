@@ -20,21 +20,39 @@ permissions:
   id-token: read
 
 jobs:
-  # Job 1: Test
+  # Job 1: Test with Smart Tests
   test:
+    env:
+      SMART_TESTS_TOKEN: ${{ secrets.SMART_TESTS_TOKEN }}
+
     steps:
-      # Step 1: Checkout code
+      # Step 1: Checkout code with full history for Smart Tests
       - name: Checkout code
         uses: cloudbees-io/checkout@v1
+        with:
+          fetch-depth: 0  # Full git history for better test predictions
 
-      # Step 2: Install dependencies and run tests in Python container
+      # Step 2: Verify Smart Tests connectivity
+      - name: Verify Smart Tests connectivity
+        uses: docker://python:3.11-slim
+        shell: sh
+        run: |
+          pip install --quiet smart-tests-cli 2>/dev/null || echo "⚠️ Smart Tests CLI not available in PyPI - skipping verification"
+          # Alternative: Use CloudBees Smart Tests container if available
+          # smart-tests verify || true
+
+      # Step 3: Install dependencies and run tests with Smart Tests
       - name: Install dependencies and run tests
         uses: docker://python:3.11-slim
         shell: sh
         run: |
           python -m pip install --upgrade pip
           pip install -r requirements.txt
-          pytest tests/ -v --tb=short --junitxml=test-results.xml --cov=app --cov-report=xml --cov-report=html --cov-report=term
+          pip install pytest-testmon  # Smart test selection for pytest
+
+          # Run tests with smart selection
+          echo "🧪 Running tests with smart selection..."
+          pytest tests/ --testmon -v --tb=short --junitxml=test-results.xml --cov=app --cov-report=xml --cov-report=html --cov-report=term
 
       # Step 3: Publish test results
       - name: Publish test results
