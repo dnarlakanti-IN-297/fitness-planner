@@ -96,18 +96,28 @@ jobs:
           echo "🎯 Creating Smart Tests subset..."
 
           # Create intelligent subset based on code changes
-          # Target 50% of tests (run only affected tests)
+          # Smart Tests will analyze tests/ directory and return specific test node IDs
           smart-tests subset pytest \
             --session @session.txt \
-            --target 50% \
-            --test-list all-test-functions.lst > smart-tests-subset.txt || echo "tests/" > smart-tests-subset.txt
+            --target 50% > smart-tests-subset.txt
 
           echo "📊 Smart Tests subset created:"
           cat smart-tests-subset.txt
 
-          # Count tests to run
-          TEST_COUNT=$(cat smart-tests-subset.txt | wc -l | tr -d ' ')
-          echo "📈 Running $TEST_COUNT tests based on Smart Tests analysis"
+          # Extract subset details
+          echo ""
+          echo "📈 Subset Statistics:"
+          grep "Candidates\|Subset\|Total" smart-tests-subset.txt || echo "Analyzing test selection..."
+
+          # Extract actual test list (after the table)
+          grep -E "tests/.*\.py" smart-tests-subset.txt > test-subset-list.txt || echo "tests/" > test-subset-list.txt
+
+          echo ""
+          echo "🎯 Tests to run:"
+          cat test-subset-list.txt
+
+          TEST_COUNT=$(wc -l < test-subset-list.txt | tr -d ' ')
+          echo "📊 Total: $TEST_COUNT test items selected"
 
       # Step 7: Run tests with Smart Tests subset
       - name: Run Smart Tests subset
@@ -119,13 +129,19 @@ jobs:
 
           echo "🧪 Running Smart Tests subset..."
 
-          # If subset contains specific test paths, use them
-          if [ -s smart-tests-subset.txt ]; then
-            echo "Running targeted test subset..."
-            # Read subset file and run those tests
-            cat smart-tests-subset.txt | xargs pytest -v --tb=short --junitxml=test-results.xml --cov=app --cov-report=xml --cov-report=html --cov-report=term
+          # Check if we have a specific test subset
+          if [ -f test-subset-list.txt ] && [ -s test-subset-list.txt ]; then
+            echo "Running Smart Tests intelligent subset..."
+
+            # Run the specific tests from the subset
+            # Each line is a test file or test node ID
+            while IFS= read -r test_path; do
+              echo "  - $test_path"
+            done < test-subset-list.txt
+
+            cat test-subset-list.txt | xargs pytest -v --tb=short --junitxml=test-results.xml --cov=app --cov-report=xml --cov-report=html --cov-report=term
           else
-            echo "Running all tests (no subset generated)..."
+            echo "Running full test suite (fallback)..."
             pytest tests/ -v --tb=short --junitxml=test-results.xml --cov=app --cov-report=xml --cov-report=html --cov-report=term
           fi
 
