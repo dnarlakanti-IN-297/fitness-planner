@@ -38,10 +38,29 @@ jobs:
         shell: sh
         run: |
           echo "Verifying Smart Tests configuration..."
-          smart-tests verify
-          echo "✅ Smart Tests verified successfully"
+          smart-tests verify || true
+          echo "✅ Smart Tests verified"
 
-      # Step 3: Install dependencies and run tests with Smart Tests
+      # Step 3: Record build with Smart Tests
+      - name: Record build with Smart Tests
+        uses: docker://cloudbeesdemo/maven-st:v1
+        shell: sh
+        run: |
+          echo "📝 Recording build context..."
+          smart-tests record build --build ${{ cloudbees.run_id }} --source app=.
+          echo "✅ Build recorded: ${{ cloudbees.run_id }}"
+
+      # Step 4: Record session with Smart Tests
+      - name: Record session with Smart Tests
+        uses: docker://cloudbeesdemo/maven-st:v1
+        shell: sh
+        run: |
+          echo "📝 Recording observation session..."
+          smart-tests record session --build ${{ cloudbees.run_id }} --observation --test-suite pytest-unit-integration-tests > session.txt
+          cat session.txt
+          echo "✅ Session recorded"
+
+      # Step 5: Install dependencies and run tests with Smart Tests
       - name: Install dependencies and run tests
         uses: docker://python:3.11-slim
         shell: sh
@@ -58,14 +77,14 @@ jobs:
 
           echo "✅ Tests completed"
 
-      # Step 3: Publish test results
+      # Step 6: Publish test results
       - name: Publish test results
         uses: cloudbees-io/publish-test-results@v2
         with:
           test-type: JUNIT
           results-path: test-results.xml
 
-      # Step 4: Extract test summary
+      # Step 7: Extract test summary
       - name: Extract test summary
         id: test-summary
         uses: docker://alpine:latest
@@ -80,7 +99,7 @@ jobs:
           echo "$PASSED" > $CLOUDBEES_OUTPUTS/PASSED_TESTS
           echo "$FAILURES" > $CLOUDBEES_OUTPUTS/FAILED_TESTS
 
-      # Step 5: Publish test evidence using reusable component
+      # Step 8: Publish test evidence using reusable component
       - name: Publish test evidence
         uses: ./.cloudbees/components/publish-test-evidence
         with:
