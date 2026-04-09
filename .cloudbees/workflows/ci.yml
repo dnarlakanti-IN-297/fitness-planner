@@ -60,42 +60,7 @@ jobs:
           cat session.txt
           echo "✅ Session recorded"
 
-      # Step 5: Discover and collect test list
-      - name: Collect test list with pytest
-        uses: docker://python:3.11-slim
-        shell: sh
-        run: |
-          python -m pip install --upgrade pip
-          pip install -r requirements.txt
-
-          echo "🔍 Collecting all test cases..."
-
-          # Collect all tests with pytest and format for Smart Tests
-          pytest --collect-only -q tests/ 2>/dev/null | \
-            grep "::" > pytest-tests.txt || echo "tests/" > pytest-tests.txt
-
-          echo "📋 Collected tests:"
-          cat pytest-tests.txt
-
-          TEST_COUNT=$(wc -l < pytest-tests.txt | tr -d ' ')
-          echo "📊 Total tests discovered: $TEST_COUNT"
-
-      # Step 6: Record tests with Smart Tests
-      - name: Record tests with Smart Tests
-        uses: docker://cloudbeesdemo/maven-st:v1
-        shell: sh
-        run: |
-          echo "📝 Recording test list with Smart Tests..."
-
-          # Send test list to Smart Tests for analysis
-          # source_roots: app/ is where the source code is located
-          cat pytest-tests.txt | smart-tests record tests \
-            --session @session.txt \
-            pytest app/
-
-          echo "✅ Tests recorded with Smart Tests"
-
-      # Step 8: Create Smart Tests subset
+      # Step 5: Create Smart Tests subset
       - name: Create Smart Tests subset
         uses: docker://cloudbeesdemo/maven-st:v1
         shell: sh
@@ -103,11 +68,12 @@ jobs:
           echo "🎯 Creating Smart Tests intelligent subset..."
 
           # Create intelligent subset based on code changes
-          # Now that tests are recorded, Smart Tests can analyze and select
+          # Use --get-tests-from-previous-sessions to let Smart Tests fetch test data from history
           smart-tests subset \
             --session @session.txt \
             --target 50% \
-            pytest > smart-tests-subset.txt
+            --get-tests-from-previous-sessions \
+            pytest app/ > smart-tests-subset.txt
 
           echo "📊 Smart Tests subset output:"
           cat smart-tests-subset.txt
@@ -118,7 +84,7 @@ jobs:
           grep "Candidates\|Subset\|Total" smart-tests-subset.txt || echo "Analyzing..."
 
           # Extract actual test list (lines with tests/)
-          grep -E "^tests/" smart-tests-subset.txt > test-subset-list.txt || cp pytest-tests.txt test-subset-list.txt
+          grep -E "^tests/" smart-tests-subset.txt > test-subset-list.txt || echo "tests/" > test-subset-list.txt
 
           echo ""
           echo "🎯 Tests selected to run:"
@@ -127,7 +93,7 @@ jobs:
           TEST_COUNT=$(wc -l < test-subset-list.txt | tr -d ' ')
           echo "📊 Total: $TEST_COUNT test items selected"
 
-      # Step 9: Run tests with Smart Tests subset
+      # Step 6: Run tests with Smart Tests subset
       - name: Run Smart Tests subset
         uses: docker://python:3.11-slim
         shell: sh
@@ -138,31 +104,33 @@ jobs:
           echo "🧪 Running Smart Tests subset..."
 
           # Check if we have a specific test subset
-          if [ -f test-subset-list.txt ] && [ -s test-subset-list.txt ]; then
+          if [ -f test-subset-list.txt ] && [ -s test-subset-list.txt ] && [ "$(cat test-subset-list.txt)" != "tests/" ]; then
             echo "Running Smart Tests intelligent subset..."
 
             # Run the specific tests from the subset
             # Each line is a test file or test node ID
+            echo "Selected tests:"
             while IFS= read -r test_path; do
               echo "  - $test_path"
             done < test-subset-list.txt
 
             cat test-subset-list.txt | xargs pytest -v --tb=short --junitxml=test-results.xml --cov=app --cov-report=xml --cov-report=html --cov-report=term
           else
-            echo "Running full test suite (fallback)..."
+            echo "Running full test suite..."
+            echo "Reason: First run or Smart Tests learning phase"
             pytest tests/ -v --tb=short --junitxml=test-results.xml --cov=app --cov-report=xml --cov-report=html --cov-report=term
           fi
 
           echo "✅ Tests completed"
 
-      # Step 10: Publish test results
+      # Step 7: Publish test results
       - name: Publish test results
         uses: cloudbees-io/publish-test-results@v2
         with:
           test-type: JUNIT
           results-path: test-results.xml
 
-      # Step 11: Extract test summary
+      # Step 8: Extract test summary
       - name: Extract test summary
         id: test-summary
         uses: docker://alpine:latest
@@ -177,7 +145,7 @@ jobs:
           echo "$PASSED" > $CLOUDBEES_OUTPUTS/PASSED_TESTS
           echo "$FAILURES" > $CLOUDBEES_OUTPUTS/FAILED_TESTS
 
-      # Step 12: Publish test evidence using reusable component
+      # Step 9: Publish test evidence using reusable component
       - name: Publish test evidence
         uses: ./.cloudbees/components/publish-test-evidence
         with:
