@@ -90,7 +90,6 @@ jobs:
           # Send test list to Smart Tests for analysis
           cat pytest-tests.txt | smart-tests record tests \
             --session @session.txt \
-            --test-suite pytest-unit-integration-tests \
             pytest
 
           echo "✅ Tests recorded with Smart Tests"
