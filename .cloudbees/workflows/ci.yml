@@ -133,14 +133,32 @@ jobs:
 
           echo "✅ Tests completed"
 
-      # Step 7: Publish test results
+      # Step 7: Record test results with Smart Tests
+      - name: Record test results with Smart Tests
+        uses: docker://cloudbeesdemo/maven-st:v1
+        shell: sh
+        run: |
+          echo "📝 Recording test results with Smart Tests..."
+
+          # Record test results for Smart Tests learning
+          # This helps Smart Tests understand which tests passed/failed
+          # and improve future subset predictions
+          smart-tests record tests \
+            --session @session.txt \
+            --no-build \
+            pytest test-results.xml || true
+
+          echo "✅ Test results recorded"
+          echo "Smart Tests will use this data to improve future test selection"
+
+      # Step 9: Publish test results
       - name: Publish test results
         uses: cloudbees-io/publish-test-results@v2
         with:
           test-type: JUNIT
           results-path: test-results.xml
 
-      # Step 8: Extract test summary
+      # Step 10: Extract test summary
       - name: Extract test summary
         id: test-summary
         uses: docker://alpine:latest
@@ -155,7 +173,7 @@ jobs:
           echo "$PASSED" > $CLOUDBEES_OUTPUTS/PASSED_TESTS
           echo "$FAILURES" > $CLOUDBEES_OUTPUTS/FAILED_TESTS
 
-      # Step 9: Publish test evidence using reusable component
+      # Step 11: Publish test evidence using reusable component
       - name: Publish test evidence
         uses: ./.cloudbees/components/publish-test-evidence
         with:
