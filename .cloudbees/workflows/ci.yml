@@ -145,7 +145,7 @@ jobs:
           # and improve future subset predictions
           cat test-results.xml | smart-tests record tests \
             --session @session.txt \
-            pytest || true
+            pytest app/ || true
 
           echo "✅ Test results recorded"
           echo "Smart Tests will use this data to improve future test selection"
