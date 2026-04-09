@@ -60,7 +60,7 @@ jobs:
           cat session.txt
           echo "✅ Session recorded"
 
-      # Step 5: Create Smart Tests subset
+      # Step 5: Create Smart Tests subset (optional during learning phase)
       - name: Create Smart Tests subset
         uses: docker://cloudbeesdemo/maven-st:v1
         shell: sh
@@ -68,30 +68,40 @@ jobs:
           echo "🎯 Creating Smart Tests intelligent subset..."
 
           # Create intelligent subset based on code changes
-          # Use --get-tests-from-previous-sessions to let Smart Tests fetch test data from history
-          # Syntax: smart-tests subset <test_runner> [options]
+          # Note: Smart Tests needs ~1 day to build historical data
+          # During learning phase, this will fall back to running all tests
           smart-tests subset pytest \
             --session @session.txt \
             --target 50% \
-            --get-tests-from-previous-sessions > smart-tests-subset.txt
+            --get-tests-from-previous-sessions > smart-tests-subset.txt 2>&1 || true
 
-          echo "📊 Smart Tests subset output:"
-          cat smart-tests-subset.txt
+          if [ -s smart-tests-subset.txt ]; then
+            echo "📊 Smart Tests subset output:"
+            cat smart-tests-subset.txt
 
-          # Extract subset details (the table)
-          echo ""
-          echo "📈 Subset Statistics:"
-          grep "Candidates\|Subset\|Total" smart-tests-subset.txt || echo "Analyzing..."
+            # Extract subset details (the table)
+            echo ""
+            echo "📈 Subset Statistics:"
+            grep "Candidates\|Subset\|Total" smart-tests-subset.txt || echo "Learning phase active"
 
-          # Extract actual test list (lines with tests/)
-          grep -E "^tests/" smart-tests-subset.txt > test-subset-list.txt || echo "tests/" > test-subset-list.txt
+            # Extract actual test list (lines with tests/)
+            grep -E "^tests/" smart-tests-subset.txt > test-subset-list.txt 2>/dev/null || echo "tests/" > test-subset-list.txt
 
-          echo ""
-          echo "🎯 Tests selected to run:"
-          cat test-subset-list.txt
+            if [ "$(cat test-subset-list.txt)" != "tests/" ]; then
+              echo ""
+              echo "🎯 Smart Tests selected subset to run:"
+              cat test-subset-list.txt
 
-          TEST_COUNT=$(wc -l < test-subset-list.txt | tr -d ' ')
-          echo "📊 Total: $TEST_COUNT test items selected"
+              TEST_COUNT=$(wc -l < test-subset-list.txt | tr -d ' ')
+              echo "📊 Total: $TEST_COUNT test items selected"
+            else
+              echo "📚 Learning phase: Running all tests to build historical data"
+            fi
+          else
+            echo "📚 Smart Tests is in learning phase (~1 day required)"
+            echo "Running all tests to build code-to-test mappings"
+            echo "tests/" > test-subset-list.txt
+          fi
 
       # Step 6: Run tests with Smart Tests subset
       - name: Run Smart Tests subset
