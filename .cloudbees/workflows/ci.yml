@@ -70,8 +70,8 @@ jobs:
 
           echo "🔍 Collecting all tests with pytest..."
 
-          # Collect all tests - this creates the full test list
-          pytest --collect-only -qq tests/ > all_tests.txt 2>&1 || true
+          # Collect all tests - only capture test node IDs (lines with ::)
+          pytest --collect-only -qq tests/ 2>&1 | grep "::" > all_tests.txt || echo "tests/" > all_tests.txt
 
           echo "📋 Collected tests:"
           cat all_tests.txt
@@ -91,14 +91,20 @@ jobs:
           smart-tests subset \
             --session @session.txt \
             --target 50% \
-            pytest app/ < all_tests.txt > subset.txt 2>&1 || cp all_tests.txt subset.txt
+            pytest app/ < all_tests.txt > subset-full.txt 2>&1 || cp all_tests.txt subset-full.txt
 
-          echo "📊 Smart Tests subset generated:"
+          echo "📊 Smart Tests subset output:"
+          cat subset-full.txt
+
+          # Extract only test paths (lines with ::) from Smart Tests output
+          grep "::" subset-full.txt > subset.txt 2>/dev/null || cp all_tests.txt subset.txt
+
+          echo ""
+          echo "📈 Extracted test subset:"
           cat subset.txt
 
-          # Count tests in subset
-          SUBSET_COUNT=$(grep -c "::" subset.txt 2>/dev/null || wc -l < subset.txt | tr -d ' ')
-          echo "📈 Subset contains: $SUBSET_COUNT tests"
+          SUBSET_COUNT=$(wc -l < subset.txt | tr -d ' ')
+          echo "📊 Subset contains: $SUBSET_COUNT tests"
 
       # Step 7: Run tests from subset
       - name: Run tests from Smart Tests subset
