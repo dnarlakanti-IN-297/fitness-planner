@@ -116,10 +116,19 @@ jobs:
 
           echo "🧪 Running tests from Smart Tests subset..."
 
-          # Run tests using subset file with pytest @subset.txt syntax
-          # Use junit_family=legacy for Smart Tests compatibility
-          if [ -f subset.txt ] && [ -s subset.txt ]; then
-            pytest @subset.txt \
+          # Debug: Check if subset.txt exists and show content
+          if [ -f subset.txt ]; then
+            echo "✅ subset.txt found"
+            echo "Content:"
+            cat subset.txt
+            echo ""
+            TEST_COUNT=$(wc -l < subset.txt | tr -d ' ')
+            echo "Tests in subset: $TEST_COUNT"
+            echo ""
+
+            # Run tests from subset using xargs instead of @subset.txt
+            # This is more reliable across containers
+            cat subset.txt | xargs pytest \
               -v \
               -o junit_family=legacy \
               --junit-xml=test-results.xml \
@@ -127,10 +136,8 @@ jobs:
               --cov-report=xml \
               --cov-report=html \
               --cov-report=term || true
-
-            echo "✅ Tests completed"
           else
-            echo "⚠️ No subset file found, running all tests"
+            echo "⚠️ subset.txt not found, running all tests"
             pytest tests/ \
               -v \
               -o junit_family=legacy \
@@ -139,6 +146,16 @@ jobs:
               --cov-report=xml \
               --cov-report=html \
               --cov-report=term || true
+          fi
+
+          echo "✅ Tests completed"
+
+          # Verify test results were generated
+          if [ -f test-results.xml ]; then
+            echo "✅ test-results.xml generated"
+            ls -lh test-results.xml
+          else
+            echo "❌ test-results.xml NOT generated"
           fi
 
       # Step 8: Record test results with Smart Tests
