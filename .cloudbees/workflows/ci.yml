@@ -148,7 +148,10 @@ jobs:
             ls -lh test-results.xml
 
             # Record results with Smart Tests
-            smart-tests record tests pytest app/ test-results.xml
+            # Must include --session to associate results with the observation session
+            smart-tests record tests \
+              --session @session.txt \
+              pytest app/ test-results.xml
 
             echo "✅ Test results recorded successfully"
           else
