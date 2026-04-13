@@ -87,25 +87,34 @@ jobs:
           echo "🎯 Generating Smart Tests subset..."
 
           # Generate subset with --session (REQUIRED despite reference docs)
-          if smart-tests subset --session @session.txt pytest < all_tests.txt > subset.txt 2>&1; then
+          if smart-tests subset --session @session.txt pytest < all_tests.txt > subset-full.txt 2>&1; then
             echo "✅ Subset command succeeded"
           else
             EXIT_CODE=$?
             echo "❌ Subset command failed with exit code: $EXIT_CODE"
             echo ""
             echo "📋 Error output:"
-            cat subset.txt
+            cat subset-full.txt
             echo ""
             echo "⚠️ Falling back to running all tests"
-            cp all_tests.txt subset.txt
+            cp all_tests.txt subset-full.txt
           fi
 
           echo ""
-          echo "📊 Smart Tests subset output:"
-          cat subset.txt
+          echo "📊 Smart Tests full output:"
+          cat subset-full.txt
+
+          # Extract ONLY test paths (lines with ::) for pytest to run
+          echo ""
+          echo "📋 Extracting test paths..."
+          grep "::" subset-full.txt > subset.txt 2>/dev/null || cp all_tests.txt subset.txt
+
+          echo "✅ Clean test list for pytest:"
+          head -10 subset.txt
+          echo "..."
 
           # Count tests in subset
-          SUBSET_COUNT=$(grep -c "::" subset.txt 2>/dev/null || wc -l < subset.txt | tr -d ' ')
+          SUBSET_COUNT=$(wc -l < subset.txt | tr -d ' ')
           TOTAL_COUNT=$(wc -l < all_tests.txt | tr -d ' ')
 
           echo ""
@@ -127,6 +136,20 @@ jobs:
 
           echo "🧪 Running tests from Smart Tests subset..."
 
+          # Debug: Check subset.txt content
+          if [ -f subset.txt ]; then
+            echo "✅ subset.txt found"
+            TEST_COUNT=$(wc -l < subset.txt | tr -d ' ')
+            echo "📊 Tests to run: $TEST_COUNT"
+            echo ""
+            echo "First 5 tests:"
+            head -5 subset.txt
+            echo ""
+          else
+            echo "❌ subset.txt NOT found!"
+            exit 1
+          fi
+
           # Run tests using @subset.txt syntax (reference implementation)
           # In observation mode, this runs all tests
           # In production mode, only runs tests in subset.txt
@@ -146,7 +169,7 @@ jobs:
             echo "✅ test-results.xml generated"
             ls -lh test-results.xml
           else
-            echo "❌ test-results.xml NOT generated"
+            echo "❌ test-results.xml NOT generated - tests did not run!"
           fi
 
       # Step 8: Record test results with Smart Tests
