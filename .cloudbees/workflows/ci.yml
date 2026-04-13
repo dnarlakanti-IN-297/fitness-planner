@@ -86,8 +86,8 @@ jobs:
         run: |
           echo "🎯 Generating Smart Tests subset..."
 
-          # Generate subset - capture exit code for error handling
-          if smart-tests subset pytest < all_tests.txt > subset.txt 2>&1; then
+          # Generate subset with --session (REQUIRED despite reference docs)
+          if smart-tests subset --session @session.txt pytest < all_tests.txt > subset.txt 2>&1; then
             echo "✅ Subset command succeeded"
           else
             EXIT_CODE=$?
@@ -156,14 +156,14 @@ jobs:
         run: |
           echo "📝 Recording test results with Smart Tests..."
 
-          # Record test results - SIMPLIFIED to match reference implementation
-          # Session is linked automatically via build ID
+          # Record test results
+          # NOTE: --session IS required despite reference docs not showing it
           if [ -f test-results.xml ]; then
             echo "Found test-results.xml"
             ls -lh test-results.xml
 
-            # Record results with Smart Tests (reference syntax)
-            smart-tests record tests pytest test-results.xml
+            # Record results with Smart Tests (session required)
+            smart-tests record tests --session @session.txt pytest test-results.xml
 
             echo "✅ Test results recorded successfully"
           else
