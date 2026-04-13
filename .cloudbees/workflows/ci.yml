@@ -86,10 +86,21 @@ jobs:
         run: |
           echo "🎯 Generating Smart Tests subset..."
 
-          # Generate subset - SIMPLIFIED to match reference implementation
-          # Session is linked automatically via build ID
-          smart-tests subset pytest < all_tests.txt > subset.txt 2>&1
+          # Generate subset - capture exit code for error handling
+          if smart-tests subset pytest < all_tests.txt > subset.txt 2>&1; then
+            echo "✅ Subset command succeeded"
+          else
+            EXIT_CODE=$?
+            echo "❌ Subset command failed with exit code: $EXIT_CODE"
+            echo ""
+            echo "📋 Error output:"
+            cat subset.txt
+            echo ""
+            echo "⚠️ Falling back to running all tests"
+            cp all_tests.txt subset.txt
+          fi
 
+          echo ""
           echo "📊 Smart Tests subset output:"
           cat subset.txt
 
