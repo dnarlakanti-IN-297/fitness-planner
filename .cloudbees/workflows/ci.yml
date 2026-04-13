@@ -86,25 +86,25 @@ jobs:
         run: |
           echo "🎯 Generating Smart Tests subset..."
 
-          # Generate subset from collected tests
-          # Smart Tests analyzes commits and predicts affected tests
-          smart-tests subset \
-            --session @session.txt \
-            --target 50% \
-            pytest app/ < all_tests.txt > subset-full.txt 2>&1 || cp all_tests.txt subset-full.txt
+          # Generate subset - SIMPLIFIED to match reference implementation
+          # Session is linked automatically via build ID
+          smart-tests subset pytest < all_tests.txt > subset.txt 2>&1
 
           echo "📊 Smart Tests subset output:"
-          cat subset-full.txt
-
-          # Extract only test paths (lines with ::) from Smart Tests output
-          grep "::" subset-full.txt > subset.txt 2>/dev/null || cp all_tests.txt subset.txt
-
-          echo ""
-          echo "📈 Extracted test subset:"
           cat subset.txt
 
-          SUBSET_COUNT=$(wc -l < subset.txt | tr -d ' ')
-          echo "📊 Subset contains: $SUBSET_COUNT tests"
+          # Count tests in subset
+          SUBSET_COUNT=$(grep -c "::" subset.txt 2>/dev/null || wc -l < subset.txt | tr -d ' ')
+          TOTAL_COUNT=$(wc -l < all_tests.txt | tr -d ' ')
+
+          echo ""
+          echo "📊 Tests: $SUBSET_COUNT / $TOTAL_COUNT"
+
+          if [ "$SUBSET_COUNT" -lt "$TOTAL_COUNT" ]; then
+            echo "🎯 Smart Tests created subset! Saving $((100 - SUBSET_COUNT * 100 / TOTAL_COUNT))% of test time"
+          else
+            echo "📚 Running all tests (learning phase or no changes detected)"
+          fi
 
       # Step 7: Run tests from subset
       - name: Run tests from Smart Tests subset
@@ -116,37 +116,17 @@ jobs:
 
           echo "🧪 Running tests from Smart Tests subset..."
 
-          # Debug: Check if subset.txt exists and show content
-          if [ -f subset.txt ]; then
-            echo "✅ subset.txt found"
-            echo "Content:"
-            cat subset.txt
-            echo ""
-            TEST_COUNT=$(wc -l < subset.txt | tr -d ' ')
-            echo "Tests in subset: $TEST_COUNT"
-            echo ""
-
-            # Run tests from subset using xargs instead of @subset.txt
-            # This is more reliable across containers
-            cat subset.txt | xargs pytest \
-              -v \
-              -o junit_family=legacy \
-              --junit-xml=test-results.xml \
-              --cov=app \
-              --cov-report=xml \
-              --cov-report=html \
-              --cov-report=term || true
-          else
-            echo "⚠️ subset.txt not found, running all tests"
-            pytest tests/ \
-              -v \
-              -o junit_family=legacy \
-              --junit-xml=test-results.xml \
-              --cov=app \
-              --cov-report=xml \
-              --cov-report=html \
-              --cov-report=term || true
-          fi
+          # Run tests using @subset.txt syntax (reference implementation)
+          # In observation mode, this runs all tests
+          # In production mode, only runs tests in subset.txt
+          pytest @subset.txt \
+            -v \
+            -o junit_family=legacy \
+            --junit-xml=test-results.xml \
+            --cov=app \
+            --cov-report=xml \
+            --cov-report=html \
+            --cov-report=term || true
 
           echo "✅ Tests completed"
 
@@ -165,16 +145,14 @@ jobs:
         run: |
           echo "📝 Recording test results with Smart Tests..."
 
-          # Record test results - pass file path as argument
+          # Record test results - SIMPLIFIED to match reference implementation
+          # Session is linked automatically via build ID
           if [ -f test-results.xml ]; then
             echo "Found test-results.xml"
             ls -lh test-results.xml
 
-            # Record results with Smart Tests
-            # Must include --session to associate results with the observation session
-            smart-tests record tests \
-              --session @session.txt \
-              pytest app/ test-results.xml
+            # Record results with Smart Tests (reference syntax)
+            smart-tests record tests pytest test-results.xml
 
             echo "✅ Test results recorded successfully"
           else
