@@ -4,6 +4,45 @@ from app.calculators import calculate_bmi, calculate_bmr, calculate_tdee, calcul
 from app.workout_engine import generate_workout_plan
 from app.diet_engine import generate_meal_plan
 
+# Import CloudBees Feature Management SDK
+from rox.server.rox_server import Rox
+from rox.server.flags.rox_flag import RoxFlag
+from rox.core.entities.rox_string import RoxString
+from rox.core.entities.rox_int import RoxInt
+from rox.core.entities.rox_double import RoxDouble
+
+
+# Create Roxflags in the Flags container class
+class Flags:
+    def __init__(self):
+        # Define the feature flags
+        self.enableTutorial = RoxFlag(False)
+        self.titleColors = RoxString('White', ['White', 'Blue', 'Green', 'Yellow'])
+        self.page = RoxInt(1, [1, 2, 3])
+        self.percentage = RoxDouble(99.9, [10.5, 50.0, 99.9])
+
+
+flags = Flags()
+
+# Register the flags container
+Rox.register(flags)
+
+# Setup the environment key
+cancel_event = Rox.setup("f47b55c1-76cb-4102-b266-4b7050af889c").result()
+
+# Boolean flag example
+print('enableTutorial is {}'.format(flags.enableTutorial.is_enabled()))
+
+# String flag example
+print('color is {}'.format(flags.titleColors.get_value()))
+
+# Int flag example
+print('page is {}'.format(flags.page.get_value()))
+
+# Double flag example
+print('percentage is {}'.format(flags.percentage.get_value()))
+
+
 app = FastAPI(
     title="Fitness & Diet Planner API",
     description="Generate personalized workout and meal plans based on your fitness goals",
