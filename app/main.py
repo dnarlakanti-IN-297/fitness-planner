@@ -27,8 +27,13 @@ flags = Flags()
 # Register the flags container
 Rox.register(flags)
 
-# Setup the environment key
-cancel_event = Rox.setup("f47b55c1-76cb-4102-b266-4b7050af889c").result()
+# Setup the environment key with timeout
+try:
+    cancel_event = Rox.setup("f47b55c1-76cb-4102-b266-4b7050af889c").result(timeout=10)
+    print('✅ Rox connected successfully!')
+except Exception as e:
+    print(f'⚠️ Rox connection failed: {e}')
+    print('   Flags will use default values')
 
 # Boolean flag example
 print('enableTutorial is {}'.format(flags.enableTutorial.is_enabled()))
