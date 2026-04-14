@@ -86,8 +86,9 @@ jobs:
         run: |
           echo "🎯 Generating Smart Tests subset..."
 
-          # Generate subset with --session (REQUIRED despite reference docs)
-          if smart-tests subset --session @session.txt pytest < all_tests.txt > subset-full.txt 2>&1; then
+          # Generate subset with --session and --target
+          # --target 50% aims to run approximately 50% of tests based on code changes
+          if smart-tests subset --session @session.txt --target 50% pytest < all_tests.txt > subset-full.txt 2>&1; then
             echo "✅ Subset command succeeded"
           else
             EXIT_CODE=$?
