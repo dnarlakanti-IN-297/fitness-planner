@@ -29,6 +29,7 @@ class DietPreference(str, Enum):
     VEGAN = "vegan"
     KETO = "keto"
     HIGH_PROTEIN = "high_protein"
+    MEDITERRANEAN = "mediterranean"
 
 
 class Equipment(str, Enum):

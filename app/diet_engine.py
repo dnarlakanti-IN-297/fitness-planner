@@ -117,14 +117,95 @@ MEALS = {
             Meal(name="Turkey jerky", calories=120, protein=18, carbs=6, fat=3),
             Meal(name="Protein shake", calories=160, protein=25, carbs=10, fat=2)
         ]
+    },
+    "mediterranean": {
+        "breakfast": [
+            Meal(name="Greek yogurt with honey, walnuts, and figs", calories=380, protein=18, carbs=45, fat=14),
+            Meal(name="Whole grain toast with avocado and tomatoes", calories=350, protein=12, carbs=42, fat=16),
+            Meal(name="Mediterranean omelet with feta and olives", calories=420, protein=24, carbs=18, fat=28)
+        ],
+        "lunch": [
+            Meal(name="Greek salad with grilled chicken and chickpeas", calories=480, protein=35, carbs=38, fat=20),
+            Meal(name="Mediterranean quinoa bowl with falafel", calories=520, protein=22, carbs=62, fat=18),
+            Meal(name="Grilled fish with tabbouleh and hummus", calories=500, protein=38, carbs=45, fat=18)
+        ],
+        "dinner": [
+            Meal(name="Herb-crusted salmon with roasted vegetables", calories=540, protein=42, carbs=35, fat=24),
+            Meal(name="Chicken souvlaki with tzatziki and whole grain pita", calories=520, protein=40, carbs=48, fat=18),
+            Meal(name="Shrimp pasta with olive oil and sun-dried tomatoes", calories=550, protein=36, carbs=58, fat=20)
+        ],
+        "snacks": [
+            Meal(name="Olives and feta cheese", calories=160, protein=6, carbs=4, fat=14),
+            Meal(name="Fresh fruit with nuts", calories=180, protein=5, carbs=22, fat=10),
+            Meal(name="Hummus with whole grain crackers", calories=170, protein=6, carbs=20, fat=8),
+            Meal(name="Greek yogurt with berries", calories=150, protein=12, carbs=20, fat=3)
+        ]
+    }
+}
+
+# Premium meal options (gourmet/restaurant-quality meals)
+PREMIUM_MEALS = {
+    "balanced": {
+        "breakfast": [
+            Meal(name="Smoked salmon eggs benedict with hollandaise", calories=520, protein=28, carbs=35, fat=28),
+            Meal(name="Acai superfood bowl with exotic fruits", calories=450, protein=15, carbs=65, fat=16),
+            Meal(name="Protein-packed breakfast burrito with chorizo", calories=580, protein=32, carbs=48, fat=26)
+        ],
+        "lunch": [
+            Meal(name="Seared tuna with sesame ginger quinoa", calories=560, protein=42, carbs=45, fat=22),
+            Meal(name="Grass-fed beef bowl with chimichurri", calories=620, protein=45, carbs=48, fat=26),
+            Meal(name="Pan-seared duck breast with wild rice", calories=640, protein=38, carbs=52, fat=30)
+        ],
+        "dinner": [
+            Meal(name="Filet mignon with truffle mashed potatoes", calories=720, protein=48, carbs=42, fat=38),
+            Meal(name="Chilean sea bass with risotto", calories=680, protein=44, carbs=55, fat=28),
+            Meal(name="Lamb chops with roasted root vegetables", calories=700, protein=46, carbs=38, fat=38)
+        ],
+        "snacks": [
+            Meal(name="Prosciutto-wrapped melon", calories=180, protein=8, carbs=18, fat=9),
+            Meal(name="Gourmet protein smoothie", calories=220, protein=28, carbs=20, fat=5),
+            Meal(name="Artisan cheese board", calories=250, protein=12, carbs=8, fat=20),
+            Meal(name="Dark chocolate with almond butter", calories=200, protein=6, carbs=18, fat=14)
+        ]
+    },
+    "high_protein": {
+        "breakfast": [
+            Meal(name="Wagyu beef and egg scramble", calories=620, protein=52, carbs=22, fat=38),
+            Meal(name="Premium protein shake with collagen", calories=480, protein=50, carbs=35, fat=14),
+            Meal(name="Steak and eggs with sweet potato hash", calories=680, protein=55, carbs=42, fat=32)
+        ],
+        "lunch": [
+            Meal(name="Grilled ribeye with quinoa power bowl", calories=720, protein=58, carbs=48, fat=32),
+            Meal(name="Sushi-grade tuna poke bowl", calories=580, protein=52, carbs=55, fat=16),
+            Meal(name="Bison burger with sweet potato fries", calories=650, protein=54, carbs=52, fat=24)
+        ],
+        "dinner": [
+            Meal(name="Dry-aged steak with truffle butter", calories=780, protein=62, carbs=35, fat=42),
+            Meal(name="Wild-caught lobster tail with vegetables", calories=620, protein=58, carbs=40, fat=20),
+            Meal(name="Organic chicken breast with gourmet sides", calories=660, protein=60, carbs=48, fat=22)
+        ],
+        "snacks": [
+            Meal(name="Premium protein bar (organic)", calories=240, protein=25, carbs=24, fat=8),
+            Meal(name="Smoked salmon with cream cheese", calories=220, protein=20, carbs=6, fat=14),
+            Meal(name="Grass-fed beef jerky", calories=180, protein=24, carbs=8, fat=6),
+            Meal(name="Collagen protein shake", calories=200, protein=28, carbs=12, fat=4)
+        ]
     }
 }
 
 
-def generate_meal_plan(target_calories: float, diet_preference: DietPreference) -> DailyMealPlan:
+def generate_meal_plan(target_calories: float, diet_preference: DietPreference, advanced: bool = False, mediterranean_enabled: bool = False) -> DailyMealPlan:
     """Generate a daily meal plan based on calorie target and diet preference."""
     preference_key = diet_preference.value
-    meals = MEALS[preference_key]
+
+    # Handle Mediterranean diet if enabled and requested
+    if mediterranean_enabled and preference_key == "mediterranean":
+        meals = MEALS["mediterranean"]
+    # Use premium meals if advanced flag is enabled and available
+    elif advanced and preference_key in PREMIUM_MEALS:
+        meals = PREMIUM_MEALS[preference_key]
+    else:
+        meals = MEALS.get(preference_key, MEALS["balanced"])
 
     # Simple selection - pick first option from each category
     breakfast = meals["breakfast"][0]

@@ -1,4 +1,5 @@
 from app.models import Gender, ActivityLevel, Goal, BMIResult, CalorieResult, MacroResult
+from typing import Optional
 
 
 def calculate_bmi(weight_kg: float, height_cm: float) -> BMIResult:
@@ -30,12 +31,23 @@ def calculate_bmi(weight_kg: float, height_cm: float) -> BMIResult:
     )
 
 
-def calculate_bmr(weight_kg: float, height_cm: float, age: int, gender: Gender) -> float:
-    """Calculate Basal Metabolic Rate using Mifflin-St Jeor Equation."""
-    if gender == Gender.MALE:
-        bmr = (10 * weight_kg) + (6.25 * height_cm) - (5 * age) + 5
+def calculate_bmr(weight_kg: float, height_cm: float, age: int, gender: Gender, body_fat_percentage: Optional[float] = None, use_katch_mcardle: bool = False) -> float:
+    """
+    Calculate Basal Metabolic Rate.
+
+    By default uses Mifflin-St Jeor Equation.
+    If use_katch_mcardle=True and body_fat_percentage is provided, uses Katch-McArdle Formula.
+    """
+    if use_katch_mcardle and body_fat_percentage is not None:
+        # Katch-McArdle Formula (requires lean body mass)
+        lean_body_mass_kg = weight_kg * (1 - body_fat_percentage / 100)
+        bmr = 370 + (21.6 * lean_body_mass_kg)
     else:
-        bmr = (10 * weight_kg) + (6.25 * height_cm) - (5 * age) - 161
+        # Mifflin-St Jeor Equation (default)
+        if gender == Gender.MALE:
+            bmr = (10 * weight_kg) + (6.25 * height_cm) - (5 * age) + 5
+        else:
+            bmr = (10 * weight_kg) + (6.25 * height_cm) - (5 * age) - 161
 
     return round(bmr, 1)
 

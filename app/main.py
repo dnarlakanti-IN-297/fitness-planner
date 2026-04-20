@@ -15,11 +15,15 @@ from rox.core.entities.rox_double import RoxDouble
 # Create Roxflags in the Flags container class
 class Flags:
     def __init__(self):
-        # Define the feature flags
+        # Fitness feature flags
+        self.premium_workouts = RoxFlag(False)  # Enable premium workout exercises
+        self.new_calorie_formula = RoxFlag(False)  # Use Katch-McArdle formula instead of Mifflin-St Jeor
+        self.advanced_meal_plans = RoxFlag(False)  # Enable advanced/premium meal options
+        self.enable_mediterranean_diet = RoxFlag(False)  # Enable Mediterranean diet option
+
+        # Demo flags (keeping for reference)
         self.enableTutorial = RoxFlag(False)
         self.titleColors = RoxString('White', ['White', 'Blue', 'Green', 'Yellow'])
-        self.page = RoxInt(1, [1, 2, 3])
-        self.percentage = RoxDouble(99.9, [10.5, 50.0, 99.9])
 
 
 flags = Flags()
@@ -45,17 +49,11 @@ async def startup_event():
         print(f'⚠️ Rox connection failed: {e}')
         print('   Flags will use default values')
 
-    # Boolean flag example
-    print('enableTutorial is {}'.format(flags.enableTutorial.is_enabled()))
-
-    # String flag example
-    print('color is {}'.format(flags.titleColors.get_value()))
-
-    # Int flag example
-    print('page is {}'.format(flags.page.get_value()))
-
-    # Double flag example
-    print('percentage is {}'.format(flags.percentage.get_value()))
+    # Feature flags status
+    print('🏋️  Premium Workouts: {}'.format(flags.premium_workouts.is_enabled()))
+    print('🔬 New Calorie Formula: {}'.format(flags.new_calorie_formula.is_enabled()))
+    print('🍽️  Advanced Meal Plans: {}'.format(flags.advanced_meal_plans.is_enabled()))
+    print('🇬🇷 Mediterranean Diet: {}'.format(flags.enable_mediterranean_diet.is_enabled()))
 
 
 @app.get("/")
@@ -99,7 +97,12 @@ def calculate_calories_endpoint(profile: UserProfile):
 
     Returns BMR, TDEE, and target calories based on goal.
     """
-    bmr = calculate_bmr(profile.weight, profile.height, profile.age, profile.gender)
+    # Use new calorie formula if feature flag is enabled
+    use_new_formula = flags.new_calorie_formula.is_enabled()
+    body_fat = getattr(profile, 'body_fat_percentage', None)
+
+    bmr = calculate_bmr(profile.weight, profile.height, profile.age, profile.gender,
+                       body_fat_percentage=body_fat, use_katch_mcardle=use_new_formula)
     tdee = calculate_tdee(bmr, profile.activity_level)
     return calculate_target_calories(tdee, profile.goal)
 
@@ -109,7 +112,11 @@ def calculate_macros_endpoint(profile: UserProfile):
     """
     Calculate macro split (protein/carbs/fat) based on user profile and goal.
     """
-    bmr = calculate_bmr(profile.weight, profile.height, profile.age, profile.gender)
+    use_new_formula = flags.new_calorie_formula.is_enabled()
+    body_fat = getattr(profile, 'body_fat_percentage', None)
+
+    bmr = calculate_bmr(profile.weight, profile.height, profile.age, profile.gender,
+                       body_fat_percentage=body_fat, use_katch_mcardle=use_new_formula)
     tdee = calculate_tdee(bmr, profile.activity_level)
     calorie_result = calculate_target_calories(tdee, profile.goal)
     return calculate_macros(calorie_result.target_calories, profile.goal)
@@ -120,7 +127,8 @@ def generate_workout_endpoint(profile: UserProfile):
     """
     Generate a weekly workout plan based on goal and available equipment.
     """
-    return generate_workout_plan(profile.goal, profile.equipment)
+    premium = flags.premium_workouts.is_enabled()
+    return generate_workout_plan(profile.goal, profile.equipment, premium=premium)
 
 
 @app.post("/generate/meal-plan", response_model=DailyMealPlan)
@@ -128,10 +136,17 @@ def generate_meal_plan_endpoint(profile: UserProfile):
     """
     Generate a daily meal plan based on calorie needs and dietary preferences.
     """
-    bmr = calculate_bmr(profile.weight, profile.height, profile.age, profile.gender)
+    use_new_formula = flags.new_calorie_formula.is_enabled()
+    body_fat = getattr(profile, 'body_fat_percentage', None)
+    advanced = flags.advanced_meal_plans.is_enabled()
+    mediterranean_enabled = flags.enable_mediterranean_diet.is_enabled()
+
+    bmr = calculate_bmr(profile.weight, profile.height, profile.age, profile.gender,
+                       body_fat_percentage=body_fat, use_katch_mcardle=use_new_formula)
     tdee = calculate_tdee(bmr, profile.activity_level)
     calorie_result = calculate_target_calories(tdee, profile.goal)
-    return generate_meal_plan(calorie_result.target_calories, profile.diet_preference)
+    return generate_meal_plan(calorie_result.target_calories, profile.diet_preference,
+                            advanced=advanced, mediterranean_enabled=mediterranean_enabled)
 
 
 @app.post("/generate/complete-plan", response_model=FitnessResponse)
@@ -144,16 +159,25 @@ def generate_complete_plan(profile: UserProfile):
     - Weekly workout plan
     - Daily meal plan
     """
+    # Get feature flags
+    use_new_formula = flags.new_calorie_formula.is_enabled()
+    body_fat = getattr(profile, 'body_fat_percentage', None)
+    premium = flags.premium_workouts.is_enabled()
+    advanced = flags.advanced_meal_plans.is_enabled()
+    mediterranean_enabled = flags.enable_mediterranean_diet.is_enabled()
+
     # Calculate all metrics
     bmi = calculate_bmi(profile.weight, profile.height)
-    bmr = calculate_bmr(profile.weight, profile.height, profile.age, profile.gender)
+    bmr = calculate_bmr(profile.weight, profile.height, profile.age, profile.gender,
+                       body_fat_percentage=body_fat, use_katch_mcardle=use_new_formula)
     tdee = calculate_tdee(bmr, profile.activity_level)
     calories = calculate_target_calories(tdee, profile.goal)
     macros = calculate_macros(calories.target_calories, profile.goal)
 
     # Generate plans
-    workout_plan = generate_workout_plan(profile.goal, profile.equipment)
-    meal_plan = generate_meal_plan(calories.target_calories, profile.diet_preference)
+    workout_plan = generate_workout_plan(profile.goal, profile.equipment, premium=premium)
+    meal_plan = generate_meal_plan(calories.target_calories, profile.diet_preference,
+                                   advanced=advanced, mediterranean_enabled=mediterranean_enabled)
 
     return FitnessResponse(
         profile=profile,

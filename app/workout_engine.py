@@ -24,31 +24,57 @@ EXERCISES = {
     }
 }
 
+# Premium exercise database (advanced/specialized exercises)
+PREMIUM_EXERCISES = {
+    "bodyweight": {
+        "upper": ["Archer Push-ups", "One-Arm Push-ups", "Muscle-ups", "Front Lever Progressions", "Handstand Push-ups", "Ring Dips"],
+        "lower": ["Pistol Squats", "Nordic Curls", "Single-Leg Box Jumps", "Dragon Flags", "Shrimp Squats"],
+        "core": ["Dragon Flags", "L-Sits", "Human Flag Progressions", "Hanging Windshield Wipers", "Hollow Body Holds"],
+        "cardio": ["Sprint Intervals", "Tabata Burpees", "Box Jump HIIT", "Battle Ropes", "Assault Bike Sprints"]
+    },
+    "home": {
+        "upper": ["Single-Arm Dumbbell Press", "Renegade Rows", "Incline/Decline Dumbbell Press", "Zottman Curls", "Arnold Press"],
+        "lower": ["Bulgarian Split Squat (Elevated)", "Single-Leg RDLs", "Dumbbell Thrusters", "Goblet Squat Pulses", "Tempo Squats"],
+        "core": ["Turkish Get-ups", "Dumbbell Windmills", "Loaded Carries", "Overhead Carries", "Suitcase Carries"],
+        "cardio": ["EMOM Burpees", "Dumbbell Complexes", "Metabolic Conditioning", "Tabata Training"]
+    },
+    "gym": {
+        "upper": ["Incline Bench Press", "Pendlay Rows", "Close-Grip Bench", "Face Pulls", "Cable Flyes", "Weighted Dips"],
+        "lower": ["Front Squats", "Sumo Deadlifts", "Hack Squats", "Walking Lunges", "Bulgarian Split Squats", "Hip Thrusts"],
+        "core": ["Weighted Planks", "Anti-Rotation Press", "TRX Fallouts", "Landmine Rotations", "GHD Sit-ups"],
+        "cardio": ["Assault Bike", "Sled Push/Pull", "Battle Ropes", "Rowing Intervals", "Ski Erg"]
+    }
+}
 
-def generate_workout_plan(goal: Goal, equipment: Equipment) -> WorkoutPlan:
+
+def generate_workout_plan(goal: Goal, equipment: Equipment, premium: bool = False) -> WorkoutPlan:
     """Generate a weekly workout plan based on goal and equipment."""
     equipment_key = equipment.value
 
     if goal == Goal.LOSE_WEIGHT:
-        plan = _generate_weight_loss_plan(equipment_key)
+        plan = _generate_weight_loss_plan(equipment_key, premium)
     elif goal == Goal.GAIN_MUSCLE:
-        plan = _generate_muscle_gain_plan(equipment_key)
+        plan = _generate_muscle_gain_plan(equipment_key, premium)
     elif goal == Goal.MAINTAIN:
-        plan = _generate_maintenance_plan(equipment_key)
+        plan = _generate_maintenance_plan(equipment_key, premium)
     else:  # IMPROVE_ENDURANCE
-        plan = _generate_endurance_plan(equipment_key)
+        plan = _generate_endurance_plan(equipment_key, premium)
+
+    notes = "Rest for 48 hours between working the same muscle group. Stay hydrated and listen to your body."
+    if premium:
+        notes += " 🌟 Premium plan with advanced exercises - ensure proper form and consider working with a trainer."
 
     return WorkoutPlan(
         goal=goal,
         equipment=equipment,
         weekly_schedule=plan,
-        notes="Rest for 48 hours between working the same muscle group. Stay hydrated and listen to your body."
+        notes=notes
     )
 
 
-def _generate_weight_loss_plan(equipment: str) -> List[WorkoutDay]:
+def _generate_weight_loss_plan(equipment: str, premium: bool = False) -> List[WorkoutDay]:
     """Weight loss focuses on cardio with strength training."""
-    exercises = EXERCISES[equipment]
+    exercises = PREMIUM_EXERCISES[equipment] if premium else EXERCISES[equipment]
 
     return [
         WorkoutDay(
@@ -113,9 +139,9 @@ def _generate_weight_loss_plan(equipment: str) -> List[WorkoutDay]:
     ]
 
 
-def _generate_muscle_gain_plan(equipment: str) -> List[WorkoutDay]:
+def _generate_muscle_gain_plan(equipment: str, premium: bool = False) -> List[WorkoutDay]:
     """Muscle gain focuses on strength training with progressive overload."""
-    exercises = EXERCISES[equipment]
+    exercises = PREMIUM_EXERCISES[equipment] if premium else EXERCISES[equipment]
 
     return [
         WorkoutDay(
@@ -182,9 +208,9 @@ def _generate_muscle_gain_plan(equipment: str) -> List[WorkoutDay]:
     ]
 
 
-def _generate_maintenance_plan(equipment: str) -> List[WorkoutDay]:
+def _generate_maintenance_plan(equipment: str, premium: bool = False) -> List[WorkoutDay]:
     """Maintenance plan balances strength and cardio."""
-    exercises = EXERCISES[equipment]
+    exercises = PREMIUM_EXERCISES[equipment] if premium else EXERCISES[equipment]
 
     return [
         WorkoutDay(
@@ -245,9 +271,9 @@ def _generate_maintenance_plan(equipment: str) -> List[WorkoutDay]:
     ]
 
 
-def _generate_endurance_plan(equipment: str) -> List[WorkoutDay]:
+def _generate_endurance_plan(equipment: str, premium: bool = False) -> List[WorkoutDay]:
     """Endurance plan focuses on cardio and stamina building."""
-    exercises = EXERCISES[equipment]
+    exercises = PREMIUM_EXERCISES[equipment] if premium else EXERCISES[equipment]
 
     return [
         WorkoutDay(
