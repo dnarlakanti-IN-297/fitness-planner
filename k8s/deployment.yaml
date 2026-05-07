@@ -16,7 +16,7 @@ spec:
     spec:
       containers:
       - name: fitness-planner
-        image: IMAGE_PLACEHOLDER  # Will be replaced by deploy workflow
+        image: dnarlakanti/fitness-planner:latest  # Updated by Unify CI workflow
         ports:
         - containerPort: 8000
           name: http
