@@ -16,29 +16,14 @@ spec:
     spec:
       containers:
       - name: fitness-planner
-        image: dnarlakanti/fitness-planner:latest  # Updated by Unify CI workflow
+        image: nginx:alpine  # Demo: Will be replaced with dnarlakanti/fitness-planner:TAG by Unify
         ports:
-        - containerPort: 8000
+        - containerPort: 80
           name: http
-        env:
-        - name: PORT
-          value: "8000"
         resources:
           requests:
-            memory: "256Mi"
-            cpu: "250m"
+            memory: "64Mi"
+            cpu: "100m"
           limits:
-            memory: "512Mi"
-            cpu: "500m"
-        livenessProbe:
-          httpGet:
-            path: /health
-            port: 8000
-          initialDelaySeconds: 10
-          periodSeconds: 10
-        readinessProbe:
-          httpGet:
-            path: /health
-            port: 8000
-          initialDelaySeconds: 5
-          periodSeconds: 5
+            memory: "128Mi"
+            cpu: "200m"
