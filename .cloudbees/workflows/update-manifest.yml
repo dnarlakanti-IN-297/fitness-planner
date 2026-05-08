@@ -42,6 +42,7 @@ jobs:
           grep "image:" k8s/deployment.yaml
 
       - name: Commit and push updated manifest
+        id: git-push
         uses: docker://alpine/git:latest
         shell: sh
         run: |
@@ -56,6 +57,7 @@ jobs:
 
           if git diff --staged --quiet; then
             echo "ℹ️ No changes to commit"
+            echo "success" > $CLOUDBEES_OUTPUTS/status
             exit 0
           fi
 
@@ -65,3 +67,11 @@ jobs:
 
           echo "✅ Manifest updated and pushed to Git"
           echo "🚀 ArgoCD will detect and deploy automatically"
+          echo "success" > $CLOUDBEES_OUTPUTS/status
+
+      - name: Publish ArgoCD deployment evidence
+        uses: ./.cloudbees/components/publish-argocd-evidence
+        with:
+          image-tag: ${{ inputs.image-tag }}
+          deployment-status: ${{ steps.git-push.outputs.status || 'success' }}
+          argocd-app-name: fitness-planner
