@@ -16,7 +16,7 @@ spec:
     spec:
       containers:
       - name: fitness-planner
-        image: nginx:alpine  # Demo: Will be replaced with dnarlakanti/fitness-planner:TAG by Unify
+        image: dnarlakanti/fitness-planner:41e47b39775e7c6d0424b0e015dbb0c8dfa14532
         ports:
         - containerPort: 8000
           name: http
