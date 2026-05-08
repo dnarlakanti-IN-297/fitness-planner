@@ -12,7 +12,7 @@ on:
 
 permissions:
   scm-token-own: write
-  scm-token-org: write
+  id-token: write
 
 jobs:
   update-manifest:
