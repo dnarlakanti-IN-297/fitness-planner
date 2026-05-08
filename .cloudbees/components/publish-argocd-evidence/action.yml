@@ -32,10 +32,10 @@ runs:
 
           ## Workflow Information
           - **Run ID**: `${{ cloudbees.run_id }}`
+          - **Run Number**: `${{ cloudbees.run_number }}`
           - **Branch**: `${{ cloudbees.scm.branch }}`
           - **Commit SHA**: `${{ cloudbees.scm.sha }}`
           - **Repository**: `${{ cloudbees.scm.repository }}`
-          - **Triggered By**: `${{ cloudbees.actor }}`
 
           ## Deployment Details
           - **Image**: `dnarlakanti/fitness-planner:${{ inputs.image-tag }}`
