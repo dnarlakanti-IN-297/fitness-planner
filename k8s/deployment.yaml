@@ -18,12 +18,15 @@ spec:
       - name: fitness-planner
         image: nginx:alpine  # Demo: Will be replaced with dnarlakanti/fitness-planner:TAG by Unify
         ports:
-        - containerPort: 80
+        - containerPort: 8000
           name: http
+        env:
+        - name: PORT
+          value: "8000"
         resources:
           requests:
-            memory: "64Mi"
-            cpu: "100m"
+            memory: "256Mi"
+            cpu: "250m"
           limits:
-            memory: "128Mi"
-            cpu: "200m"
+            memory: "512Mi"
+            cpu: "500m"

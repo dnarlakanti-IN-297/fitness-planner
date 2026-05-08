@@ -1,0 +1,67 @@
+apiVersion: automation.cloudbees.io/v1alpha1
+kind: workflow
+name: Update Kubernetes Manifest
+
+on:
+  workflow_call:
+    inputs:
+      image-tag:
+        description: 'Docker image tag to deploy'
+        required: true
+        type: string
+
+permissions:
+  scm-token-own: write
+  scm-token-org: write
+
+jobs:
+  update-manifest:
+    steps:
+      - name: Checkout code
+        uses: cloudbees-io/checkout@v1
+        with:
+          fetch-depth: 0
+
+      - name: Update deployment manifest
+        uses: docker://alpine:latest
+        shell: sh
+        run: |
+          IMAGE_TAG="${{ inputs.image-tag }}"
+          IMAGE="dnarlakanti/fitness-planner:${IMAGE_TAG}"
+
+          echo "📝 Updating k8s/deployment.yaml with image: ${IMAGE}"
+
+          # Install sed
+          apk add --no-cache sed
+
+          # Update the image in deployment.yaml
+          sed -i "s|image: dnarlakanti/fitness-planner:.*|image: ${IMAGE}|g" k8s/deployment.yaml
+          sed -i "s|image: nginx:alpine.*|image: ${IMAGE}|g" k8s/deployment.yaml
+
+          echo "✅ Updated deployment.yaml:"
+          grep "image:" k8s/deployment.yaml
+
+      - name: Commit and push updated manifest
+        uses: docker://alpine/git:latest
+        shell: sh
+        run: |
+          IMAGE_TAG="${{ inputs.image-tag }}"
+
+          # Configure git
+          git config user.name "CloudBees Unify Bot"
+          git config user.email "unify-bot@cloudbees.com"
+
+          # Check if there are changes
+          git add k8s/deployment.yaml
+
+          if git diff --staged --quiet; then
+            echo "ℹ️ No changes to commit"
+            exit 0
+          fi
+
+          # Commit and push
+          git commit -m "Deploy image ${IMAGE_TAG} via Unify CI [skip ci]"
+          git push origin main
+
+          echo "✅ Manifest updated and pushed to Git"
+          echo "🚀 ArgoCD will detect and deploy automatically"
