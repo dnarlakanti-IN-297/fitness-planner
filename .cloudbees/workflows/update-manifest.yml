@@ -9,6 +9,11 @@ on:
         description: 'Docker image tag to deploy'
         required: true
         type: string
+      environment:
+        description: 'Target environment'
+        required: false
+        type: string
+        default: 'dev'
 
 permissions:
   scm-token-own: write
@@ -75,3 +80,4 @@ jobs:
           image-tag: ${{ inputs.image-tag }}
           deployment-status: ${{ steps.git-push.outputs.status || 'success' }}
           argocd-app-name: fitness-planner
+          environment: ${{ inputs.environment }}

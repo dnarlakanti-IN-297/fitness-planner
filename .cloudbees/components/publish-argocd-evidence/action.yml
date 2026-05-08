@@ -14,6 +14,10 @@ inputs:
     description: 'ArgoCD application name'
     required: false
     default: 'fitness-planner'
+  environment:
+    description: 'Target environment (dev/staging/prod)'
+    required: false
+    default: 'dev'
 
 runs:
   using: composite
@@ -26,6 +30,7 @@ runs:
 
           ## Deployment Summary
           - **Status**: ${{ inputs.deployment-status }}
+          - **Environment**: `${{ inputs.environment }}`
           - **Image Tag**: `${{ inputs.image-tag }}`
           - **ArgoCD Application**: `${{ inputs.argocd-app-name }}`
           - **Namespace**: `fitness-planner`

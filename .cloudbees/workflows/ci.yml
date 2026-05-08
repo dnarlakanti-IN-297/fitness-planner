@@ -12,6 +12,32 @@ on:
       - main
       - develop
   workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Target environment for deployment'
+        required: true
+        type: string
+        default: 'dev'
+      skip_tests:
+        description: 'Skip test execution (not recommended for production)'
+        required: false
+        type: boolean
+        default: false
+      custom_image_tag:
+        description: 'Custom image tag (leave empty to use commit SHA)'
+        required: false
+        type: string
+        default: ''
+      deploy_to_argocd:
+        description: 'Update manifest for ArgoCD deployment'
+        required: false
+        type: boolean
+        default: true
+      run_smart_tests:
+        description: 'Use Smart Tests subset (faster) or run all tests'
+        required: false
+        type: boolean
+        default: true
 
 # CloudBees Unify permissions
 permissions:
@@ -22,6 +48,8 @@ permissions:
 jobs:
   # Job 1: Test with Smart Tests
   test:
+    # Skip tests if requested (manual trigger only)
+    if: ${{ !inputs.skip_tests }}
     env:
       SMART_TESTS_TOKEN: ${{ secrets.SMART_TESTS_TOKEN }}
 
@@ -229,6 +257,7 @@ jobs:
   # Calls the reusable build workflow
   build:
     needs: test
+    if: ${{ !failure() }}
     uses: ./.cloudbees/workflows/build-reusable.yml
     with:
       image-name: fitness-planner
@@ -243,6 +272,8 @@ jobs:
   # ArgoCD will detect the change and deploy automatically
   deploy:
     needs: build
+    if: ${{ !failure() && inputs.deploy_to_argocd != false }}
     uses: ./.cloudbees/workflows/update-manifest.yml
     with:
-      image-tag: ${{ cloudbees.scm.sha }}
+      image-tag: ${{ inputs.custom_image_tag || cloudbees.scm.sha }}
+      environment: ${{ inputs.environment || 'dev' }}
