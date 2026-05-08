@@ -1,0 +1,44 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: fitness-planner
+  namespace: argocd
+  # Finalizer to ensure proper cleanup
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  # Project to which this application belongs
+  project: default
+
+  # Source repository configuration
+  source:
+    # Your GitHub repository
+    repoURL: https://github.com/dnarlakanti-IN-297/fitness-planner.git
+    targetRevision: main  # or 'develop' for staging
+    path: k8s             # Path to Kubernetes manifests
+
+  # Destination cluster and namespace
+  destination:
+    server: https://kubernetes.default.svc  # In-cluster
+    namespace: fitness-planner
+
+  # Sync policy - how ArgoCD should sync your app
+  syncPolicy:
+    # Automated sync configuration
+    automated:
+      prune: true        # Delete resources that are no longer in Git
+      selfHeal: true     # Auto-sync if someone makes manual changes to cluster
+      allowEmpty: false  # Don't delete all resources if Git path is empty
+
+    # Sync options
+    syncOptions:
+      - CreateNamespace=true  # Auto-create namespace if it doesn't exist
+      - PruneLast=true        # Prune resources after new ones are created
+
+    # Retry configuration for failed syncs
+    retry:
+      limit: 5            # Number of retry attempts
+      backoff:
+        duration: 5s      # Initial backoff duration
+        factor: 2         # Backoff factor (5s, 10s, 20s, 40s, 80s)
+        maxDuration: 3m   # Maximum backoff duration

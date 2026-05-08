@@ -1,0 +1,33 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: fitness-planner-prod
+  namespace: argocd
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: default
+
+  source:
+    repoURL: https://github.com/dnarlakanti-IN-297/fitness-planner.git
+    targetRevision: main  # Production tracks main branch
+    path: k8s
+
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: fitness-planner-prod
+
+  syncPolicy:
+    # Manual sync for production - requires approval
+    syncOptions:
+      - CreateNamespace=true
+      - PruneLast=true
+    retry:
+      limit: 5
+      backoff:
+        duration: 5s
+        factor: 2
+        maxDuration: 3m
+
+  # Note: No automated sync for production
+  # You must manually sync from ArgoCD UI or CLI
