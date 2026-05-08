@@ -1,0 +1,52 @@
+apiVersion: automation.cloudbees.io/v1alpha1
+kind: workflow
+name: Test Parameters
+
+on:
+  workflow_dispatch:
+    inputs:
+      test_string:
+        type: string
+        description: 'Test string parameter'
+        required: true
+        default: 'hello'
+      test_boolean:
+        type: boolean
+        description: 'Test boolean parameter'
+        required: false
+        default: false
+
+permissions:
+  id-token: read
+
+jobs:
+  test-inputs:
+    steps:
+      - name: Print all available contexts
+        uses: docker://alpine:latest
+        shell: sh
+        run: |
+          echo "=== Testing Different Syntaxes ==="
+
+          echo "Available environment variables:"
+          env | sort
+
+          echo ""
+          echo "=== Test 1: Direct env vars ==="
+          echo "TEST_STRING: ${TEST_STRING:-not found}"
+          echo "test_string: ${test_string:-not found}"
+
+          echo ""
+          echo "=== Test 2: CloudBees syntax ==="
+          echo "This will show in workflow if syntax is correct"
+          echo "Attempt 1: ${{ inputs.test_string }}"
+          echo "Attempt 2: ${{ vars.test_string }}"
+          echo "Attempt 3: ${{ cloudbees.inputs.test_string }}"
+
+          echo ""
+          echo "=== Test 3: Boolean ==="
+          echo "Boolean attempt 1: ${{ inputs.test_boolean }}"
+          echo "Boolean attempt 2: ${{ vars.test_boolean }}"
+
+          echo ""
+          echo "Done! Check which syntax worked above."
