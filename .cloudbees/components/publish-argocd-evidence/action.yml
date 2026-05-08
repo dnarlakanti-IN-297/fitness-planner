@@ -34,7 +34,7 @@ runs:
           - **Run ID**: `${{ cloudbees.run_id }}`
           - **Branch**: `${{ cloudbees.scm.branch }}`
           - **Commit SHA**: `${{ cloudbees.scm.sha }}`
-          - **Commit Message**: `${{ cloudbees.scm.commit_message }}`
+          - **Repository**: `${{ cloudbees.scm.repository }}`
           - **Triggered By**: `${{ cloudbees.actor }}`
 
           ## Deployment Details
