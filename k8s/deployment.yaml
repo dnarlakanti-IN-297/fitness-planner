@@ -16,7 +16,7 @@ spec:
     spec:
       containers:
       - name: fitness-planner
-        image: dnarlakanti/fitness-planner:de9de5c15cf031d3bc458f3360d56ca515d56e53
+        image: dnarlakanti/fitness-planner:06aaec40c0d672e2cfdba832458b2a5e373d4130
         ports:
         - containerPort: 8000
           name: http
