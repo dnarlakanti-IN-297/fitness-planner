@@ -1,0 +1,69 @@
+apiVersion: automation.cloudbees.io/v1alpha1
+kind: workflow
+name: Staged Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      target_environment:
+        type: choice
+        description: 'Environment to deploy to'
+        required: true
+        default: 'qa'
+        options:
+          - qa
+          - staging
+          - production
+
+permissions:
+  scm-token-own: write
+  id-token: write
+
+env:
+  TARGET_ENV: ${{ inputs.target_environment }}
+
+jobs:
+  # Stage 1: Deploy to QA
+  deploy-qa:
+    if: ${{ env.TARGET_ENV == 'qa' }}
+    steps:
+      - name: Checkout
+        uses: cloudbees-io/checkout@v1
+
+      - name: Deploy to QA
+        uses: docker://alpine:latest
+        shell: sh
+        run: |
+          echo "✅ Deploying to QA environment"
+          echo "Environment selected: ${{ inputs.target_environment }}"
+          echo "This would deploy to fitness-planner-qa namespace"
+
+  # Stage 2: Deploy to Staging
+  deploy-staging:
+    if: ${{ env.TARGET_ENV == 'staging' }}
+    steps:
+      - name: Checkout
+        uses: cloudbees-io/checkout@v1
+
+      - name: Deploy to Staging
+        uses: docker://alpine:latest
+        shell: sh
+        run: |
+          echo "✅ Deploying to STAGING environment"
+          echo "Environment selected: ${{ inputs.target_environment }}"
+          echo "This would deploy to fitness-planner-staging namespace"
+
+  # Stage 3: Deploy to Production
+  deploy-production:
+    if: ${{ env.TARGET_ENV == 'production' }}
+    steps:
+      - name: Checkout
+        uses: cloudbees-io/checkout@v1
+
+      - name: Deploy to Production
+        uses: docker://alpine:latest
+        shell: sh
+        run: |
+          echo "✅ Deploying to PRODUCTION environment"
+          echo "Environment selected: ${{ inputs.target_environment }}"
+          echo "This would deploy to fitness-planner-prod namespace"
