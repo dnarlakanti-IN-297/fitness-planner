@@ -29,10 +29,33 @@ jobs:
         uses: docker://alpine/git:latest
         shell: sh
         run: |
-          ENV="${{ inputs.environment }}"
-          IMAGE_TAG="${{ cloudbees.scm.sha }}"
+          echo "=========================================="
+          echo "TESTING PARAMETER ACCESS"
+          echo "=========================================="
+
+          echo "Test 1 - inputs.environment: ${{ inputs.environment }}"
+          echo "Test 2 - vars.environment: ${{ vars.environment }}"
+          echo "Test 3 - env.ENVIRONMENT: ${ENVIRONMENT:-not-set}"
+          echo "Test 4 - env.environment: ${environment:-not-set}"
+
+          echo ""
+          echo "All environment variables:"
+          env | grep -i env || echo "No env vars found"
 
           echo "=========================================="
+
+          # Try to get environment from multiple sources
+          ENV="${{ inputs.environment }}"
+          if [ -z "$ENV" ] || [ "$ENV" = "" ]; then
+            ENV="${{ vars.environment }}"
+          fi
+          if [ -z "$ENV" ] || [ "$ENV" = "" ]; then
+            ENV="${ENVIRONMENT:-qa}"
+          fi
+
+          IMAGE_TAG="${{ cloudbees.scm.sha }}"
+
+          echo ""
           echo "DEPLOYING TO: ${ENV}"
           echo "IMAGE TAG: ${IMAGE_TAG}"
           echo "=========================================="
