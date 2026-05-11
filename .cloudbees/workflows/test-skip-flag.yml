@@ -5,7 +5,7 @@ name: Test Skip Flag
 on:
   workflow_dispatch:
     inputs:
-      skip_tests:
+      test_skip_flag:
         type: boolean
         description: 'Skip test execution?'
         required: false
@@ -23,20 +23,20 @@ jobs:
         run: |
           echo "=========================================="
           echo "Input parameter received:"
-          echo "skip_tests = ${{ inputs.skip_tests }}"
+          echo "test_skip_flag = ${{ inputs.test_skip_flag }}"
           echo "=========================================="
 
       - name: Run tests
         uses: docker://alpine:latest
         shell: sh
         run: |
-          SKIP="${{ inputs.skip_tests }}"
+          SKIP="${{ inputs.test_skip_flag }}"
 
           if [ "${SKIP}" = "true" ]; then
-            echo "⏭️  SKIPPING TESTS (skip_tests = true)"
+            echo "⏭️  SKIPPING TESTS (test_skip_flag = true)"
             echo "Tests would be skipped here"
           else
-            echo "🧪 RUNNING TESTS (skip_tests = false)"
+            echo "🧪 RUNNING TESTS (test_skip_flag = false)"
             echo "Test 1: Running..."
             echo "Test 2: Running..."
             echo "Test 3: Running..."
@@ -50,5 +50,5 @@ jobs:
           echo ""
           echo "=========================================="
           echo "Result: Input parameter worked!"
-          echo "You set skip_tests = ${{ inputs.skip_tests }}"
+          echo "You set test_skip_flag = ${{ inputs.test_skip_flag }}"
           echo "=========================================="
