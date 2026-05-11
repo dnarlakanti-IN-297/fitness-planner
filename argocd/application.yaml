@@ -1,7 +1,7 @@
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
-  name: fitness-planner
+  name: fitness-planner-staging
   namespace: argocd
   # Finalizer to ensure proper cleanup
   finalizers:
@@ -20,7 +20,7 @@ spec:
   # Destination cluster and namespace
   destination:
     server: https://kubernetes.default.svc  # In-cluster
-    namespace: fitness-planner
+    namespace: fitness-planner-staging
 
   # Sync policy - how ArgoCD should sync your app
   syncPolicy:

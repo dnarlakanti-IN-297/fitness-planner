@@ -1,7 +1,7 @@
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
-  name: fitness-planner-dev
+  name: fitness-planner-qa
   namespace: argocd
   finalizers:
     - resources-finalizer.argocd.argoproj.io
@@ -10,12 +10,12 @@ spec:
 
   source:
     repoURL: https://github.com/dnarlakanti-IN-297/fitness-planner.git
-    targetRevision: develop  # Dev environment tracks develop branch
+    targetRevision: develop  # QA environment tracks develop branch
     path: k8s
 
   destination:
     server: https://kubernetes.default.svc
-    namespace: fitness-planner-dev
+    namespace: fitness-planner-qa
 
   syncPolicy:
     automated:
