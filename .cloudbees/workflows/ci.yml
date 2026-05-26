@@ -307,27 +307,32 @@ jobs:
           COMMIT_MSG=$(git log -1 --pretty=%B)
           BRANCH="${{ cloudbees.scm.branch }}"
           FAILED_JOB="${{ steps.check-failure.outputs.failed_job }}"
+          BUILD_ID="${{ cloudbees.run_id }}"
 
-          # Create Jira ticket summary and description
-          SUMMARY="🔴 Fitness Planner Build Failed - ${FAILED_JOB}"
+          # Create Jira ticket summary
+          SUMMARY="Build Failed - ${FAILED_JOB} - fitness-planner"
 
-          DESCRIPTION="h2. Build Failure Details
+          # Create description using cat
+          DESCRIPTION=$(cat <<EOF
+Build Failure Details
 
-*Build ID:* ${{ cloudbees.run_id }}
-*Branch:* ${BRANCH}
-*Commit:* ${COMMIT_SHA:0:8}
-*Failed Job:* ${FAILED_JOB}
-*Triggered by:* CloudBees Unify CI
+Build ID: ${BUILD_ID}
+Branch: ${BRANCH}
+Commit: ${COMMIT_SHA:0:8}
+Failed Job: ${FAILED_JOB}
+Triggered by: CloudBees Unify CI
 
-h3. Commit Message
-{quote}${COMMIT_MSG}{quote}
+Commit Message:
+${COMMIT_MSG}
 
-h3. Actions Required
-* Investigate the failure in the failed job
-* Check build logs for error details
-* Fix the issue and re-run the build
+Actions Required:
+- Investigate the failure in the failed job
+- Check build logs for error details
+- Fix the issue and re-run the build
 
-[View Build Details|${BUILD_URL}]"
+View Build: ${BUILD_URL}
+EOF
+)
 
           # Create JSON payload for Jira API
           PAYLOAD=$(jq -n \
