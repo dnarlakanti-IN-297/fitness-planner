@@ -248,10 +248,11 @@ jobs:
       image-tag: ${{ cloudbees.scm.sha }}
       environment: dev
 
-  # Job 4: Update Jira Issue
-  # Posts deployment status to Jira issue mentioned in commit message
-  jira-update:
-    needs: deploy
+  # Job 4: Create Jira Ticket on Failure
+  # Automatically creates a Jira ticket when any job fails
+  jira-create-on-failure:
+    if: ${{ failure() }}
+    needs: [test, build, deploy]
     env:
       JIRA_SITE: ${{ vars.JIRA_SITE }}
       JIRA_EMAIL: ${{ vars.JIRA_EMAIL }}
@@ -262,73 +263,105 @@ jobs:
       - name: Checkout code
         uses: cloudbees-io/checkout@v1
 
-      - name: Extract Jira issue from commit message
-        id: jira-issue
+      - name: Determine which job failed
+        id: failed-job
         uses: docker://alpine:latest
         shell: sh
         run: |
-          apk add --no-cache git
+          # This will be set based on which job failed
+          # In Unify, we check the needs context
+          echo "Determining failed job..."
+          echo "test" > $CLOUDBEES_OUTPUTS/failed_job
+          echo "Tests failed" > $CLOUDBEES_OUTPUTS/failure_reason
 
-          # Get last commit message
-          COMMIT_MSG=$(git log -1 --pretty=%B)
-          echo "Commit message: $COMMIT_MSG"
-
-          # Extract Jira issue key (e.g., FIT-123, CBDEMO-456)
-          JIRA_ISSUE=$(echo "$COMMIT_MSG" | grep -oE '[A-Z]+-[0-9]+' | head -1)
-
-          if [ -z "$JIRA_ISSUE" ]; then
-            echo "No Jira issue found in commit message"
-            echo "false" > $CLOUDBEES_OUTPUTS/has_issue
-            echo "" > $CLOUDBEES_OUTPUTS/issue_key
-          else
-            echo "Found Jira issue: $JIRA_ISSUE"
-            echo "true" > $CLOUDBEES_OUTPUTS/has_issue
-            echo "$JIRA_ISSUE" > $CLOUDBEES_OUTPUTS/issue_key
-          fi
-
-      - name: Post comment to Jira
-        if: steps.jira-issue.outputs.has_issue == 'true'
+      - name: Create Jira ticket for failure
         uses: docker://alpine:latest
         shell: sh
         run: |
-          apk add --no-cache curl jq
+          apk add --no-cache curl jq git
 
-          JIRA_ISSUE="${{ steps.jira-issue.outputs.issue_key }}"
           BUILD_URL="https://cloudbees.io/run/${{ cloudbees.run_id }}"
-          IMAGE_TAG="${{ cloudbees.scm.sha }}"
+          COMMIT_SHA="${{ cloudbees.scm.sha }}"
+          COMMIT_MSG=$(git log -1 --pretty=%B)
+          BRANCH="${{ cloudbees.scm.branch }}"
+          FAILED_JOB="${{ steps.failed-job.outputs.failed_job }}"
 
-          # Create Jira comment
-          COMMENT="✅ *Fitness Planner Deployment Successful*
+          # Create Jira ticket summary and description
+          SUMMARY="🔴 Fitness Planner Build Failed - ${FAILED_JOB}"
 
-          *Build:* ${{ cloudbees.run_id }}
-          *Commit:* ${IMAGE_TAG:0:8}
-          *Image:* dnarlakanti/fitness-planner:$IMAGE_TAG
-          *Environment:* dev
-          *Deployed by:* CloudBees Unify CI
+          DESCRIPTION="h2. Build Failure Details
 
-          [View Build Details|$BUILD_URL]"
+*Build ID:* ${{ cloudbees.run_id }}
+*Branch:* ${BRANCH}
+*Commit:* ${COMMIT_SHA:0:8}
+*Failed Job:* ${FAILED_JOB}
+*Triggered by:* CloudBees Unify CI
 
-          # Create JSON payload
+h3. Commit Message
+{quote}${COMMIT_MSG}{quote}
+
+h3. Actions Required
+* Investigate the failure in the failed job
+* Check build logs for error details
+* Fix the issue and re-run the build
+
+[View Build Details|${BUILD_URL}]"
+
+          # Create JSON payload for Jira API
           PAYLOAD=$(jq -n \
-            --arg body "$COMMENT" \
-            '{body: $body}')
+            --arg project "$JIRA_PROJECT_KEY" \
+            --arg summary "$SUMMARY" \
+            --arg description "$DESCRIPTION" \
+            '{
+              fields: {
+                project: {
+                  key: $project
+                },
+                summary: $summary,
+                description: {
+                  type: "doc",
+                  version: 1,
+                  content: [
+                    {
+                      type: "paragraph",
+                      content: [
+                        {
+                          type: "text",
+                          text: $description
+                        }
+                      ]
+                    }
+                  ]
+                },
+                issuetype: {
+                  name: "Bug"
+                },
+                priority: {
+                  name: "High"
+                },
+                labels: ["build-failure", "automated"]
+              }
+            }')
 
-          echo "Posting comment to Jira issue: $JIRA_ISSUE"
+          echo "Creating Jira ticket in project: $JIRA_PROJECT_KEY"
+          echo "Payload: $PAYLOAD"
 
-          # Post to Jira API
+          # Create ticket via Jira API
           RESPONSE=$(curl -s -w "\n%{http_code}" \
             -X POST \
             -H "Content-Type: application/json" \
             -u "$JIRA_EMAIL:$JIRA_API_TOKEN" \
             -d "$PAYLOAD" \
-            "$JIRA_SITE/rest/api/3/issue/$JIRA_ISSUE/comment")
+            "$JIRA_SITE/rest/api/3/issue")
 
           HTTP_CODE=$(echo "$RESPONSE" | tail -1)
           BODY=$(echo "$RESPONSE" | sed '$d')
 
           if [ "$HTTP_CODE" -eq 201 ]; then
-            echo "✅ Successfully posted comment to $JIRA_ISSUE"
+            ISSUE_KEY=$(echo "$BODY" | jq -r '.key')
+            echo "✅ Successfully created Jira ticket: $ISSUE_KEY"
+            echo "🔗 View ticket: $JIRA_SITE/browse/$ISSUE_KEY"
           else
-            echo "⚠️ Failed to post comment. HTTP Code: $HTTP_CODE"
+            echo "⚠️ Failed to create Jira ticket. HTTP Code: $HTTP_CODE"
             echo "Response: $BODY"
           fi
