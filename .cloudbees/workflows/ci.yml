@@ -247,3 +247,88 @@ jobs:
     with:
       image-tag: ${{ cloudbees.scm.sha }}
       environment: dev
+
+  # Job 4: Update Jira Issue
+  # Posts deployment status to Jira issue mentioned in commit message
+  jira-update:
+    needs: deploy
+    env:
+      JIRA_SITE: ${{ secrets.JIRA_SITE }}
+      JIRA_EMAIL: ${{ secrets.JIRA_EMAIL }}
+      JIRA_API_TOKEN: ${{ secrets.JIRA_API_TOKEN }}
+      JIRA_PROJECT_KEY: ${{ secrets.JIRA_PROJECT_KEY }}
+
+    steps:
+      - name: Checkout code
+        uses: cloudbees-io/checkout@v1
+
+      - name: Extract Jira issue from commit message
+        id: jira-issue
+        uses: docker://alpine:latest
+        shell: sh
+        run: |
+          apk add --no-cache git
+
+          # Get last commit message
+          COMMIT_MSG=$(git log -1 --pretty=%B)
+          echo "Commit message: $COMMIT_MSG"
+
+          # Extract Jira issue key (e.g., FIT-123, CBDEMO-456)
+          JIRA_ISSUE=$(echo "$COMMIT_MSG" | grep -oE '[A-Z]+-[0-9]+' | head -1)
+
+          if [ -z "$JIRA_ISSUE" ]; then
+            echo "No Jira issue found in commit message"
+            echo "false" > $CLOUDBEES_OUTPUTS/has_issue
+            echo "" > $CLOUDBEES_OUTPUTS/issue_key
+          else
+            echo "Found Jira issue: $JIRA_ISSUE"
+            echo "true" > $CLOUDBEES_OUTPUTS/has_issue
+            echo "$JIRA_ISSUE" > $CLOUDBEES_OUTPUTS/issue_key
+          fi
+
+      - name: Post comment to Jira
+        if: steps.jira-issue.outputs.has_issue == 'true'
+        uses: docker://alpine:latest
+        shell: sh
+        run: |
+          apk add --no-cache curl jq
+
+          JIRA_ISSUE="${{ steps.jira-issue.outputs.issue_key }}"
+          BUILD_URL="https://cloudbees.io/run/${{ cloudbees.run_id }}"
+          IMAGE_TAG="${{ cloudbees.scm.sha }}"
+
+          # Create Jira comment
+          COMMENT="✅ *Fitness Planner Deployment Successful*
+
+          *Build:* ${{ cloudbees.run_id }}
+          *Commit:* ${IMAGE_TAG:0:8}
+          *Image:* dnarlakanti/fitness-planner:$IMAGE_TAG
+          *Environment:* dev
+          *Deployed by:* CloudBees Unify CI
+
+          [View Build Details|$BUILD_URL]"
+
+          # Create JSON payload
+          PAYLOAD=$(jq -n \
+            --arg body "$COMMENT" \
+            '{body: $body}')
+
+          echo "Posting comment to Jira issue: $JIRA_ISSUE"
+
+          # Post to Jira API
+          RESPONSE=$(curl -s -w "\n%{http_code}" \
+            -X POST \
+            -H "Content-Type: application/json" \
+            -u "$JIRA_EMAIL:$JIRA_API_TOKEN" \
+            -d "$PAYLOAD" \
+            "$JIRA_SITE/rest/api/3/issue/$JIRA_ISSUE/comment")
+
+          HTTP_CODE=$(echo "$RESPONSE" | tail -1)
+          BODY=$(echo "$RESPONSE" | sed '$d')
+
+          if [ "$HTTP_CODE" -eq 201 ]; then
+            echo "✅ Successfully posted comment to $JIRA_ISSUE"
+          else
+            echo "⚠️ Failed to post comment. HTTP Code: $HTTP_CODE"
+            echo "Response: $BODY"
+          fi
