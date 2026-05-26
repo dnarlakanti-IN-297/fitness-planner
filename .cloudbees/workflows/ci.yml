@@ -251,7 +251,7 @@ jobs:
   # Job 4: Create Jira Ticket on Failure
   # Automatically creates a Jira ticket when any job fails
   jira-create-on-failure:
-    if: ${{ failure() }}
+    if: ${{ always() }}
     needs: [test, build, deploy]
     env:
       JIRA_SITE: ${{ vars.JIRA_SITE }}
@@ -263,18 +263,40 @@ jobs:
       - name: Checkout code
         uses: cloudbees-io/checkout@v1
 
-      - name: Determine which job failed
-        id: failed-job
+      - name: Check if any job failed
+        id: check-failure
         uses: docker://alpine:latest
         shell: sh
         run: |
-          # This will be set based on which job failed
-          # In Unify, we check the needs context
-          echo "Determining failed job..."
-          echo "test" > $CLOUDBEES_OUTPUTS/failed_job
-          echo "Tests failed" > $CLOUDBEES_OUTPUTS/failure_reason
+          # Check the result of each job
+          TEST_RESULT="${{ needs.test.result }}"
+          BUILD_RESULT="${{ needs.build.result }}"
+          DEPLOY_RESULT="${{ needs.deploy.result }}"
+
+          echo "Test result: $TEST_RESULT"
+          echo "Build result: $BUILD_RESULT"
+          echo "Deploy result: $DEPLOY_RESULT"
+
+          FAILED_JOB=""
+          if [ "$TEST_RESULT" = "failure" ]; then
+            FAILED_JOB="test"
+          elif [ "$BUILD_RESULT" = "failure" ]; then
+            FAILED_JOB="build"
+          elif [ "$DEPLOY_RESULT" = "failure" ]; then
+            FAILED_JOB="deploy"
+          fi
+
+          if [ -z "$FAILED_JOB" ]; then
+            echo "No failures detected, skipping Jira ticket creation"
+            echo "false" > $CLOUDBEES_OUTPUTS/should_create_ticket
+          else
+            echo "Failure detected in: $FAILED_JOB"
+            echo "true" > $CLOUDBEES_OUTPUTS/should_create_ticket
+            echo "$FAILED_JOB" > $CLOUDBEES_OUTPUTS/failed_job
+          fi
 
       - name: Create Jira ticket for failure
+        if: steps.check-failure.outputs.should_create_ticket == 'true'
         uses: docker://alpine:latest
         shell: sh
         run: |
@@ -284,7 +306,7 @@ jobs:
           COMMIT_SHA="${{ cloudbees.scm.sha }}"
           COMMIT_MSG=$(git log -1 --pretty=%B)
           BRANCH="${{ cloudbees.scm.branch }}"
-          FAILED_JOB="${{ steps.failed-job.outputs.failed_job }}"
+          FAILED_JOB="${{ steps.check-failure.outputs.failed_job }}"
 
           # Create Jira ticket summary and description
           SUMMARY="🔴 Fitness Planner Build Failed - ${FAILED_JOB}"
