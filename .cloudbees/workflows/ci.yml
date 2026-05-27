@@ -225,6 +225,75 @@ jobs:
           passed-tests: ${{ steps.test-summary.outputs.PASSED_TESTS }}
           failed-tests: ${{ steps.test-summary.outputs.FAILED_TESTS }}
 
+      # Step 12: Create Jira ticket on test failure (TEMPORARY - RUNS ON SUCCESS FOR TESTING)
+      - name: Create Jira ticket for build status
+        uses: docker://alpine:latest
+        shell: sh
+        env:
+          JIRA_SITE: ${{ vars.JIRA_SITE }}
+          JIRA_EMAIL: ${{ vars.JIRA_EMAIL }}
+          JIRA_API_TOKEN: ${{ secrets.JIRA_API_TOKEN }}
+          JIRA_PROJECT_KEY: ${{ vars.JIRA_PROJECT_KEY }}
+        run: |
+          apk add --no-cache curl jq git
+
+          BUILD_URL="https://cloudbees.io/run/${{ cloudbees.run_id }}"
+          COMMIT_SHA="${{ cloudbees.scm.sha }}"
+          COMMIT_MSG=$(git log -1 --pretty=%B)
+          BRANCH="${{ cloudbees.scm.branch }}"
+          BUILD_ID="${{ cloudbees.run_id }}"
+
+          # TEMPORARY: Testing ticket creation (change to "Test Success" for now)
+          SUMMARY="Build Status Test - fitness-planner - Run $BUILD_ID"
+          DESCRIPTION="This is a TEST ticket to verify Jira integration works.\n\nBuild ID: ${BUILD_ID}\nBranch: ${BRANCH}\nCommit: ${COMMIT_SHA:0:8}\nJob: test\nStatus: Success (temporary test)\n\nCommit Message:\n${COMMIT_MSG}\n\nView Build: ${BUILD_URL}"
+
+          PAYLOAD=$(jq -n \
+            --arg project "$JIRA_PROJECT_KEY" \
+            --arg summary "$SUMMARY" \
+            --arg description "$DESCRIPTION" \
+            '{
+              fields: {
+                project: { key: $project },
+                summary: $summary,
+                description: {
+                  type: "doc",
+                  version: 1,
+                  content: [{
+                    type: "paragraph",
+                    content: [{
+                      type: "text",
+                      text: $description
+                    }]
+                  }]
+                },
+                issuetype: { name: "Task" },
+                priority: { name: "Medium" },
+                labels: ["automated", "test-integration"]
+              }
+            }')
+
+          echo "Creating TEST Jira ticket in project: $JIRA_PROJECT_KEY"
+
+          RESPONSE=$(curl -s -w "\n%{http_code}" \
+            -X POST \
+            -H "Content-Type: application/json" \
+            -u "$JIRA_EMAIL:$JIRA_API_TOKEN" \
+            -d "$PAYLOAD" \
+            "$JIRA_SITE/rest/api/3/issue")
+
+          HTTP_CODE=$(echo "$RESPONSE" | tail -1)
+          BODY=$(echo "$RESPONSE" | sed '$d')
+
+          if [ "$HTTP_CODE" -eq 201 ]; then
+            ISSUE_KEY=$(echo "$BODY" | jq -r '.key')
+            echo "✅ Successfully created Jira ticket: $ISSUE_KEY"
+            echo "🔗 View ticket: $JIRA_SITE/browse/$ISSUE_KEY"
+          else
+            echo "⚠️ Failed to create Jira ticket. HTTP Code: $HTTP_CODE"
+            echo "Response: $BODY"
+            exit 0
+          fi
+
   # Job 2: Build and Push Docker Image
   # Calls the reusable build workflow
   build:
@@ -247,185 +316,3 @@ jobs:
     with:
       image-tag: ${{ cloudbees.scm.sha }}
       environment: dev
-
-  # Job 4: Create Jira Ticket on Test Failure
-  jira-on-test-failure:
-    if: ${{ failure() }}
-    needs: test
-    env:
-      JIRA_SITE: ${{ vars.JIRA_SITE }}
-      JIRA_EMAIL: ${{ vars.JIRA_EMAIL }}
-      JIRA_API_TOKEN: ${{ secrets.JIRA_API_TOKEN }}
-      JIRA_PROJECT_KEY: ${{ vars.JIRA_PROJECT_KEY }}
-
-    steps:
-      - name: Checkout code
-        uses: cloudbees-io/checkout@v1
-
-      - name: Create Jira ticket for test failure
-        uses: docker://alpine:latest
-        shell: sh
-        run: |
-          apk add --no-cache curl jq git
-
-          BUILD_URL="https://cloudbees.io/run/${{ cloudbees.run_id }}"
-          COMMIT_SHA="${{ cloudbees.scm.sha }}"
-          COMMIT_MSG=$(git log -1 --pretty=%B)
-          BRANCH="${{ cloudbees.scm.branch }}"
-          BUILD_ID="${{ cloudbees.run_id }}"
-          FAILED_JOB="test"
-
-          # Create Jira ticket summary
-          SUMMARY="Build Failed - ${FAILED_JOB} - fitness-planner"
-
-          # Create description
-          DESCRIPTION="Build Failure Details\n\nBuild ID: ${BUILD_ID}\nBranch: ${BRANCH}\nCommit: ${COMMIT_SHA:0:8}\nFailed Job: ${FAILED_JOB}\nTriggered by: CloudBees Unify CI\n\nCommit Message:\n${COMMIT_MSG}\n\nActions Required:\n- Investigate the failure in the failed job\n- Check build logs for error details\n- Fix the issue and re-run the build\n\nView Build: ${BUILD_URL}"
-
-          # Create JSON payload for Jira API
-          PAYLOAD=$(jq -n \
-            --arg project "$JIRA_PROJECT_KEY" \
-            --arg summary "$SUMMARY" \
-            --arg description "$DESCRIPTION" \
-            '{
-              fields: {
-                project: {
-                  key: $project
-                },
-                summary: $summary,
-                description: {
-                  type: "doc",
-                  version: 1,
-                  content: [
-                    {
-                      type: "paragraph",
-                      content: [
-                        {
-                          type: "text",
-                          text: $description
-                        }
-                      ]
-                    }
-                  ]
-                },
-                issuetype: {
-                  name: "Bug"
-                },
-                priority: {
-                  name: "High"
-                },
-                labels: ["build-failure", "automated", "test-failure"]
-              }
-            }')
-
-          echo "Creating Jira ticket in project: $JIRA_PROJECT_KEY"
-
-          # Create ticket via Jira API
-          RESPONSE=$(curl -s -w "\n%{http_code}" \
-            -X POST \
-            -H "Content-Type: application/json" \
-            -u "$JIRA_EMAIL:$JIRA_API_TOKEN" \
-            -d "$PAYLOAD" \
-            "$JIRA_SITE/rest/api/3/issue")
-
-          HTTP_CODE=$(echo "$RESPONSE" | tail -1)
-          BODY=$(echo "$RESPONSE" | sed '$d')
-
-          if [ "$HTTP_CODE" -eq 201 ]; then
-            ISSUE_KEY=$(echo "$BODY" | jq -r '.key')
-            echo "✅ Successfully created Jira ticket: $ISSUE_KEY"
-            echo "🔗 View ticket: $JIRA_SITE/browse/$ISSUE_KEY"
-          else
-            echo "⚠️ Failed to create Jira ticket. HTTP Code: $HTTP_CODE"
-            echo "Response: $BODY"
-          fi
-
-  # Job 5: Create Jira Ticket on Deploy Failure
-  jira-on-deploy-failure:
-    if: ${{ failure() }}
-    needs: [test, build, deploy]
-    env:
-      JIRA_SITE: ${{ vars.JIRA_SITE }}
-      JIRA_EMAIL: ${{ vars.JIRA_EMAIL }}
-      JIRA_API_TOKEN: ${{ secrets.JIRA_API_TOKEN }}
-      JIRA_PROJECT_KEY: ${{ vars.JIRA_PROJECT_KEY }}
-
-    steps:
-      - name: Checkout code
-        uses: cloudbees-io/checkout@v1
-
-      - name: Create Jira ticket for deploy failure
-        uses: docker://alpine:latest
-        shell: sh
-        run: |
-          apk add --no-cache curl jq git
-
-          BUILD_URL="https://cloudbees.io/run/${{ cloudbees.run_id }}"
-          COMMIT_SHA="${{ cloudbees.scm.sha }}"
-          COMMIT_MSG=$(git log -1 --pretty=%B)
-          BRANCH="${{ cloudbees.scm.branch }}"
-          BUILD_ID="${{ cloudbees.run_id }}"
-          FAILED_JOB="deploy"
-
-          # Create Jira ticket summary
-          SUMMARY="Build Failed - ${FAILED_JOB} - fitness-planner"
-
-          # Create description
-          DESCRIPTION="Build Failure Details\n\nBuild ID: ${BUILD_ID}\nBranch: ${BRANCH}\nCommit: ${COMMIT_SHA:0:8}\nFailed Job: ${FAILED_JOB}\nTriggered by: CloudBees Unify CI\n\nCommit Message:\n${COMMIT_MSG}\n\nActions Required:\n- Investigate the failure in the failed job\n- Check build logs for error details\n- Fix the issue and re-run the build\n\nView Build: ${BUILD_URL}"
-
-          # Create JSON payload for Jira API
-          PAYLOAD=$(jq -n \
-            --arg project "$JIRA_PROJECT_KEY" \
-            --arg summary "$SUMMARY" \
-            --arg description "$DESCRIPTION" \
-            '{
-              fields: {
-                project: {
-                  key: $project
-                },
-                summary: $summary,
-                description: {
-                  type: "doc",
-                  version: 1,
-                  content: [
-                    {
-                      type: "paragraph",
-                      content: [
-                        {
-                          type: "text",
-                          text: $description
-                        }
-                      ]
-                    }
-                  ]
-                },
-                issuetype: {
-                  name: "Bug"
-                },
-                priority: {
-                  name: "High"
-                },
-                labels: ["build-failure", "automated", "deploy-failure"]
-              }
-            }')
-
-          echo "Creating Jira ticket in project: $JIRA_PROJECT_KEY"
-
-          # Create ticket via Jira API
-          RESPONSE=$(curl -s -w "\n%{http_code}" \
-            -X POST \
-            -H "Content-Type: application/json" \
-            -u "$JIRA_EMAIL:$JIRA_API_TOKEN" \
-            -d "$PAYLOAD" \
-            "$JIRA_SITE/rest/api/3/issue")
-
-          HTTP_CODE=$(echo "$RESPONSE" | tail -1)
-          BODY=$(echo "$RESPONSE" | sed '$d')
-
-          if [ "$HTTP_CODE" -eq 201 ]; then
-            ISSUE_KEY=$(echo "$BODY" | jq -r '.key')
-            echo "✅ Successfully created Jira ticket: $ISSUE_KEY"
-            echo "🔗 View ticket: $JIRA_SITE/browse/$ISSUE_KEY"
-          else
-            echo "⚠️ Failed to create Jira ticket. HTTP Code: $HTTP_CODE"
-            echo "Response: $BODY"
-          fi
