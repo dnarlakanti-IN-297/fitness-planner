@@ -312,27 +312,8 @@ jobs:
           # Create Jira ticket summary
           SUMMARY="Build Failed - ${FAILED_JOB} - fitness-planner"
 
-          # Create description using cat
-          DESCRIPTION=$(cat <<EOF
-Build Failure Details
-
-Build ID: ${BUILD_ID}
-Branch: ${BRANCH}
-Commit: ${COMMIT_SHA:0:8}
-Failed Job: ${FAILED_JOB}
-Triggered by: CloudBees Unify CI
-
-Commit Message:
-${COMMIT_MSG}
-
-Actions Required:
-- Investigate the failure in the failed job
-- Check build logs for error details
-- Fix the issue and re-run the build
-
-View Build: ${BUILD_URL}
-EOF
-)
+          # Create description
+          DESCRIPTION="Build Failure Details\n\nBuild ID: ${BUILD_ID}\nBranch: ${BRANCH}\nCommit: ${COMMIT_SHA:0:8}\nFailed Job: ${FAILED_JOB}\nTriggered by: CloudBees Unify CI\n\nCommit Message:\n${COMMIT_MSG}\n\nActions Required:\n- Investigate the failure in the failed job\n- Check build logs for error details\n- Fix the issue and re-run the build\n\nView Build: ${BUILD_URL}"
 
           # Create JSON payload for Jira API
           PAYLOAD=$(jq -n \
